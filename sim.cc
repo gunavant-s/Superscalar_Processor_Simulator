@@ -19,6 +19,20 @@
 
 using namespace std;
 
+struct pipeline_entries{
+    // for tracking
+    // in each state increment the states cycle by 1, we can use age or instruction count?
+    // first trying with instruction count
+    int instruction_number = 0;
+    int cycles_count = 0;
+    int op_type = 0;
+    int source1=0,source2=0;
+    int age = 0;
+    bool valid = false;
+    int destination=0;
+    int fetch=0,decode=0,rename=0,reg_read=0,dispatch=0,issue=0,execute=0,writeback=0,retire=0;
+};
+
 struct RMT{  //rename map table
     bool valid = 0;
     uint32_t tag=0;
@@ -31,8 +45,6 @@ struct ROB{
     // no mis,exe needed
     bool ready = false;
     bool valid = false;
-    struct ROB *head;  // Head pointer
-    struct ROB *tail;  // Tail pointer
     uint32_t pc = 0;
 };
 
@@ -59,7 +71,8 @@ struct DE{
     int source1_rob = 0;
     int source2 = 0;
     int source2_rob = 0;
-
+    bool source1_ready=false;
+    bool source2_ready=false;
     int age = 0;
 };
 
@@ -73,6 +86,7 @@ struct RN{
     int source1 = 0;
     uint32_t source1_tag=0;
     bool source1_in_rob=false;
+    bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
     uint32_t source2_tag=0;
@@ -89,6 +103,7 @@ struct RR{
     int source1 = 0;
     uint32_t source1_tag=0;
     bool source1_in_rob=false;
+    bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
     uint32_t source2_tag=0;
@@ -105,6 +120,7 @@ struct DI{
     int source1 = 0;
     uint32_t source1_tag=0;
     bool source1_in_rob=false;
+    bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
     uint32_t source2_tag=0;
@@ -182,9 +198,11 @@ class superscalar{
     int head=0,tail=0; // increment whenever
     int width=0,iq_size=0,rob_size=0;
     uint64_t pc = 0;
+    int cycles = 0; // increases in advance cycle only
     int instructions_count=0;
-    struct ROB *head_ptr; // pointer to the head of rob
-    struct ROB *tail_ptr; // tail of rob, can;t put in struct ig
+    vector <pipeline_entries> pseudo_pipeline;
+    // struct ROB *head_ptr; // pointer to the head of rob
+    // struct ROB *tail_ptr; // tail of rob, can;t put in struct ig
     vector <ROB> rob;
     vector <RMT> rmt;
     vector <RT> retire;
@@ -195,13 +213,15 @@ class superscalar{
     vector <RR> reg_read;
     vector <RN> rename;
     vector <DE> decode;
+    int head = 0,tail = 0;
 
     superscalar(int width,int iq_size, int rob_size){
         this->width = width;
         this->iq_size = iq_size;
         this->rob_size = rob_size;
-        head_ptr = &rob[0];
-        tail_ptr = &rob[0];
+        pseudo_pipeline.resize(100000);
+        // head_ptr = &rob[0];
+        // tail_ptr = &rob[0];
         rob.resize(rob_size);
         writeback.resize(width*5);
         execute_list.resize(width*5);
@@ -212,6 +232,11 @@ class superscalar{
         decode.resize(width);
     }
     
+    void RegRead(){
+        // If RR contains a register-read bundle:
+        
+    }
+
     void Rename(){
         // If RN contains a rename bundle: 
         bool bundle_present = false;
@@ -289,8 +314,24 @@ class superscalar{
                             rmt[temp_destination].valid = true;
                             rmt[temp_destination].tag = rob[tail].number;
                         }
-                        // need to increment tail then
-                        tail = tail + 1
+                        // need to increment tail then, if points to last then make it 0
+                        tail = (tail == 66)?(0):(tail + 1);
+
+                        //and advance it from RN TO RR
+                        reg_read[i].valid = rename[i].valid;
+                        reg_read[i].destination = rename[i].destination;
+                        reg_read[i].destination_tag = rename[i].destination_tag;
+                        reg_read[i].op_type = rename[i].op_type;
+                        reg_read[i].source1 = rename[i].source1;
+                        reg_read[i].source1_in_rob = rename[i].source1_in_rob;
+                        reg_read[i].source1_tag = rename[i].source1_tag;
+                        reg_read[i].source1_ready = rename[i].source1_ready;
+                        reg_read[i].source2 = rename[i].source2;
+                        reg_read[i].source2_in_rob = rename[i].source2_in_rob;
+                        reg_read[i].source2_ready = rename[i].source2_ready;
+                        reg_read[i].source2_tag = rename[i].source2_tag;
+                        rename[i].valid = false;
+                        pseudo_pipeline[instructions_count].reg_read = cycles + 1;
                     }
                 }
             }
@@ -326,7 +367,11 @@ class superscalar{
                         rename[i].source2 = decode[i].source2;
                         rename[i].age = decode[i].age;
                         rename[i].valid = decode[i].valid;
+                        rename[i].source1_ready = decode[i].source1_ready;
+                        rename[i].source2_ready = decode[i].source2_ready;
                         decode[i].valid = false;
+                        // rename age leda inst cont
+                        pseudo_pipeline[instructions_count].rename = cycles + 1;
                     }                    
                 }
             }
@@ -353,13 +398,24 @@ class superscalar{
             if(decode_empty){    //if DE is empty
                 for(int i=0;i<width;i++){    //upto width only
                     fscanf(fp,"%llx %d %d %d %d\n",&pc,&op_type,&destination,&source1,&source2);
+                    instructions_count += 1;
                     decode[i].valid = true;
                     decode[i].op_type = op_type;
                     decode[i].destination = destination;
                     decode[i].source1 = source1;
                     decode[i].source2 = source2;
-                    instructions_count += 1;
                     decode[i].age=instructions_count;
+
+                    //now putting into serial pipeline
+                    pseudo_pipeline[instructions_count].instruction_number = instructions_count;
+                    pseudo_pipeline[instructions_count].cycles_count = cycles;
+                    pseudo_pipeline[instructions_count].op_type = op_type;
+                    pseudo_pipeline[instructions_count].source1 = source1;
+                    pseudo_pipeline[instructions_count].source2 = source2;
+                    pseudo_pipeline[instructions_count].destination = destination;
+                    pseudo_pipeline[instructions_count].valid = true;
+                    pseudo_pipeline[instructions_count].fetch = cycles;
+                    pseudo_pipeline[instructions_count].decode = cycles + 1;
 
 
                     if(feof(fp)){
