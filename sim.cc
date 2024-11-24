@@ -37,6 +37,7 @@ struct ROB{
     int destination = 0;
     // no mis,exe needed
     bool ready = false;
+    bool valid = false;
     struct ROB *head;  // Head pointer
     struct ROB *tail;  // Tail pointer
     uint32_t pc = 0;
@@ -47,30 +48,18 @@ struct IQ{  //issue queue
     int destination_tag = 0;
     bool source1_ready = false;
     int source1_value = 0;
-    int source1_tag=0;
-    int source1_rob=0;
+    uint32_t source1_tag=0;
+    bool source1_in_rob=false;
     bool source2_ready=false;
     int source2_value=0;
-    int source2_tag=0;
-    int source2_rob=0;
+    uint32_t source2_tag=0;
+    bool source2_in_rob=false;
 };
 
 
-// struct FE{
-//     bool valid=false;
-//     int op_type=0;
-//     int destination=0;
-//     int source1=0;
-//     int source1_rob=0;
-//     int source2=0;
-//     int source2_rob=0;
-
-//     int age=0;
-// };
-
 
 struct DE{
-    bool valid; // if instructions present true
+    bool valid = false; // if instructions present true
     int op_type=0;
     int destination = 0;
     int source1 = 0;
@@ -82,85 +71,113 @@ struct DE{
 };
 
 struct RN{
-    bool valid;
-    int op_type;
+    bool valid = false;
+    int op_type = 0;
     int destination = 0;
+    uint32_t destination_tag = 0;
     int source1 = 0;
-    int source1_rob = 0;
-    int source2 = 0;
-    int source2_rob = 0;
+    uint32_t source1_tag=0;
+    bool source1_in_rob=false;
+    bool source2_ready=false;
+    int source2=0;
+    uint32_t source2_tag=0;
+    bool source2_in_rob=false;
 
     int age = 0;
 };
 
 struct RR{
-    bool valid;
-    int op_type;
+    bool valid = false;
+    int op_type = 0;
     int destination = 0;
+    uint32_t destination_tag = 0;
     int source1 = 0;
-    int source1_rob = 0;
-    int source2 = 0;
-    int source2_rob = 0;
+    uint32_t source1_tag=0;
+    bool source1_in_rob=false;
+    bool source2_ready=false;
+    int source2=0;
+    uint32_t source2_tag=0;
+    bool source2_in_rob=false;
 
     int age = 0;
 };
 
 struct DI{
-    bool valid;
-    int op_type;
+    bool valid = false;
+    int op_type = 0;
     int destination = 0;
+    uint32_t destination_tag = 0;
     int source1 = 0;
-    int source1_rob = 0;
-    int source2 = 0;
-    int source2_rob = 0;
+    uint32_t source1_tag=0;
+    bool source1_in_rob=false;
+    bool source2_ready=false;
+    int source2=0;
+    uint32_t source2_tag=0;
+    bool source2_in_rob=false;
 
     int age = 0;
 };
 
 struct IS{
-    bool valid;
-    int op_type;
+    bool valid = false;
+    int op_type = 0;
     int destination = 0;
+    uint32_t destination_tag = 0;
     int source1 = 0;
-    int source1_rob = 0;
-    int source2 = 0;
-    int source2_rob = 0;
+    uint32_t source1_tag=0;
+    bool source1_in_rob=false;
+    bool source2_ready=false;
+    int source2=0;
+    uint32_t source2_tag=0;
+    bool source2_in_rob=false;
 
     int age = 0;
 };
 
 struct EX{
-    bool valid;
-    int op_type;
+    bool valid = false;
+    int op_type = 0;
     int destination = 0;
+    uint32_t destination_tag = 0;
     int source1 = 0;
-    int source1_rob = 0;
-    int source2 = 0;
-    int source2_rob = 0;
+    uint32_t source1_tag=0;
+    bool source1_in_rob=false;
+    bool source2_ready=false;
+    int source2=0;
+    uint32_t source2_tag=0;
+    bool source2_in_rob=false;
 
     int age = 0;
 };
 
 struct WB{
-    bool valid;
-    int op_type;
+    bool valid = false;
+    int op_type = 0;
     int destination = 0;
+    uint32_t destination_tag = 0;
     int source1 = 0;
-    int source1_rob = 0;
-    int source2 = 0;
-    int source2_rob = 0;
+    uint32_t source1_tag=0;
+    bool source1_in_rob=false;
+    bool source2_ready=false;
+    int source2=0;
+    uint32_t source2_tag=0;
+    bool source2_in_rob=false;
 
     int age = 0;
 };
 
 struct RT{
-    bool valid;
-    int op_type;
+    bool valid = false;
+    int op_type = 0;
     int destination = 0;
+    uint32_t destination_tag = 0;
     int source1 = 0;
-    int source1_rob = 0;
-    int source2 = 0;
-    int source2_rob = 0;
+    uint32_t source1_tag=0;
+    bool source1_in_rob=false;
+    bool source2_ready=false;
+    int source2=0;
+    uint32_t source2_tag=0;
+    bool source2_in_rob=false;
 
     int age = 0;
 };
@@ -168,11 +185,11 @@ struct RT{
 class superscalar{
     public:
     int head=0,tail=0; // increment whenever
-    int width,iq_size,rob_size;
-    uint64_t pc;
+    int width=0,iq_size=0,rob_size=0;
+    uint64_t pc = 0;
     int instructions_count=0;
     struct ROB *head_ptr; // pointer to the head of rob
-    struct ROB *tail_ptr; // tail of rob
+    struct ROB *tail_ptr; // tail of rob, can;t put in struct ig
     vector <ROB> rob;
     vector <RMT> rmt;
     vector <RT> retire;
@@ -200,58 +217,114 @@ class superscalar{
         decode.resize(width);
     }
     
-    void decode(){
+    void Rename(){
+        // If RN contains a rename bundle: 
         bool bundle_present = false;
-        bool rename_vacant = false;
-        int rename_count=0;
+        int invalid_value = -1; // if equal to this do nothing
 
         for(int i = 0;i<width;i++){
-            if(decode[i].valid == 1){
+            if(rename[i].valid){
                 bundle_present = true;
+                break;
+            }
+        }
+        //  RR is empty
+        bool rr_empty = true;
+        for(int i = 0;i<width;i++){
+            if(reg_read[i].valid){
+                rr_empty = false; //if atleast one not empty do nothing
+                return;
+            }
+        }
+        
+        if(bundle_present){
+            //the ROB has enough free entries >= width
+            int rob_counter = 0;
+            for(int i = 0;i<67;i++){
+                if(!rob[i].valid){
+                    rob_counter++;
+                }
+            }
+            bool enough_spaces_in_rob = rob_counter >= width;
+
+            if(enough_spaces_in_rob && rr_empty){
+                for(int i = 0;i<width;i++){
+                    if(rename[i].valid){ // only change for valid
+                        
+                    }
+                }
+            }
+        }
+
+    }
+
+    void Decode(){
+        bool bundle_present = false;
+        bool rename_vacant = true;
+
+        for(int i = 0;i<width;i++){
+            if(decode[i].valid){
+                bundle_present = true;
+                break;
             }
         }
 
         if(bundle_present){
             for(int i = 0;i < width;i++){
-                if(!rename[i].valid){
-                    rename_count+=1;
+                if(rename[i].valid){
+                    rename_vacant = false; // not empty, do nothing
+                    return;
                 }
             }
-            rename_vacant = (rename_count == width);
-
+            // if total empty should we check if decode i valid also
             if (rename_vacant){
                 for(int i=0;i < width;i++){
-                    // if(rename[i].valid)
-                    rename[i].op_type = decode[i].op_type;
-                    rename[i].destination = decode[i].destination;
-                    rename[i].source1 = decode[i].source1;
-                    rename[i].source2 = decode[i].source2;
-                    rename[i].age = decode[i].age;
-                    rename[i].valid = decode[i].valid;
-                    decode[i].valid = false;                    
+                    if(decode[i].valid){
+                        rename[i].op_type = decode[i].op_type;
+                        rename[i].destination = decode[i].destination;
+                        rename[i].source1 = decode[i].source1;
+                        rename[i].source2 = decode[i].source2;
+                        rename[i].age = decode[i].age;
+                        rename[i].valid = decode[i].valid;
+                        decode[i].valid = false;
+                    }                    
                 }
             }
             
         }
     }
 
-    void fetch(FILE *fp){
+    void Fetch(FILE *fp){
+        bool decode_empty = true;
+        int op_type = 0;
+        int destination = 0;
+        int source1 = 0;
+        int source2 = 0;
+        uint32_t pc = 0;
         int decode_instructions_count=0;
         for(int i=0;i<width;i++){
             if(decode[i].valid){
-                decode_instructions_count++;
+                decode_empty = false; //not empty
+                return;
             }
         }
-        if(decode_instructions_count==0 && !(feof(fp))){  //more instructions in the  trace file and if DE is empty
-            for(int i=0;i<width;i++){    //fetch upto width instructions
-                fscanf(fp,"%llx %d %d %d %d\n",&pc,&decode[i].op_type,&decode[i].destination,&decode[i].source1,&decode[i].source2);
-                decode[i].valid = true;
-                instructions_count += 1;
-                decode[i].age=instructions_count;
+
+        if(!(feof(fp))){  //instructions in trace file 
+            if(decode_empty){    //if DE is empty
+                for(int i=0;i<width;i++){    //upto width only
+                    fscanf(fp,"%llx %d %d %d %d\n",&pc,&op_type,&destination,&source1,&source2);
+                    decode[i].valid = true;
+                    decode[i].op_type = op_type;
+                    decode[i].destination = destination;
+                    decode[i].source1 = source1;
+                    decode[i].source2 = source2;
+                    instructions_count += 1;
+                    decode[i].age=instructions_count;
 
 
-                if(feof(fp)){
-                    break; // no more instructions
+                    if(feof(fp)){
+                        break; // no more instructions
+                    }
                 }
             }
         }
