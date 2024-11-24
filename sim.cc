@@ -37,6 +37,8 @@ struct ROB{
     int destination = 0;
     // no mis,exe needed
     bool ready = false;
+    struct ROB *head;  // Head pointer
+    struct ROB *tail;  // Tail pointer
     uint32_t pc = 0;
 };
 
@@ -54,17 +56,17 @@ struct IQ{  //issue queue
 };
 
 
-struct FE{
-    bool valid=false;
-    int op_type=0;
-    int destination=0;
-    int source1=0;
-    int source1_rob=0;
-    int source2=0;
-    int source2_rob=0;
+// struct FE{
+//     bool valid=false;
+//     int op_type=0;
+//     int destination=0;
+//     int source1=0;
+//     int source1_rob=0;
+//     int source2=0;
+//     int source2_rob=0;
 
-    int age=0;
-};
+//     int age=0;
+// };
 
 
 struct DE{
@@ -166,21 +168,11 @@ struct RT{
 class superscalar{
     public:
     int head=0,tail=0; // increment whenever
-    int width;
+    int width,iq_size,rob_size;
     uint64_t pc;
     int instructions_count=0;
-    superscalar(int width,int iq_size, int rob_size){
-        
-        rob.resize(rob_size);
-        writeback.resize(width*5);
-        execute_list.resize(width*5);
-        dispatch.resize(width);
-        issue_q.resize(iq_size);
-        reg_read.resize(width);
-        rename.resize(width);
-        decode.resize(width);
-    }
-    
+    struct ROB *head_ptr; // pointer to the head of rob
+    struct ROB *tail_ptr; // tail of rob
     vector <ROB> rob;
     vector <RMT> rmt;
     vector <RT> retire;
@@ -191,8 +183,23 @@ class superscalar{
     vector <RR> reg_read;
     vector <RN> rename;
     vector <DE> decode;
-    // vector <FE> fetch; // not there in fetch ignore
 
+    superscalar(int width,int iq_size, int rob_size){
+        this->width = width;
+        this->iq_size = iq_size;
+        this->rob_size = rob_size;
+        head_ptr = &rob[0];
+        tail_ptr = &rob[0];
+        rob.resize(rob_size);
+        writeback.resize(width*5);
+        execute_list.resize(width*5);
+        dispatch.resize(width);
+        issue_q.resize(iq_size);
+        reg_read.resize(width);
+        rename.resize(width);
+        decode.resize(width);
+    }
+    
     void decode(){
         int decode_count=0,rename_count=0;
 
