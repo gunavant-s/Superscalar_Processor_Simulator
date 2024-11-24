@@ -5,13 +5,6 @@
 #include "sim_proc.h"
 #include <vector>
 
-/************
- * Rename
- * Allocate nre rob entry at tail
- * 
- * 
- */
-
 /*  argc holds the number of command line arguments
     argv[] holds the commands themselves
 
@@ -56,7 +49,7 @@ struct IQ{  //issue queue
     bool source2_in_rob=false;
 };
 
-
+// fetch function not needed
 
 struct DE{
     bool valid = false; // if instructions present true
@@ -69,6 +62,8 @@ struct DE{
 
     int age = 0;
 };
+
+// from RN stages sourcei_in_rob to tell if srci will be produced by an instruction currently in the pipeline. The instruction must wait for this value before proceeding.
 
 struct RN{
     bool valid = false;
@@ -250,7 +245,52 @@ class superscalar{
             if(enough_spaces_in_rob && rr_empty){
                 for(int i = 0;i<width;i++){
                     if(rename[i].valid){ // only change for valid
-                        
+                        // now check source, destination there or not
+
+                        if(rename[i].source1 != invalid_value){
+                            // valid source reg
+                            int temp = rename[i].source1;
+                            if(rmt[temp].valid){
+                                // then it is waiting for value in pipeline
+                                rename[i].source1_in_rob = true;
+                                rename[i].source1_tag = rmt[temp].tag;
+                                // tag given to rename. for mapping
+                            }
+                            else{
+                                // if not waiting then in ARF, set to 0
+                                rename[i].source1_in_rob = false;
+                                // not there in rob
+                            }
+                        }
+                        // same thing for s2
+                        if(rename[i].source2 != invalid_value){
+                            // valid source reg
+                            int temp = rename[i].source2;
+                            if(rmt[temp].valid){
+                                // if there in RMT then it is waiting for value in pipeline
+                                rename[i].source2_in_rob = true;
+                                rename[i].source2_tag = rmt[temp].tag;
+                                // tag given to rename. for mapping
+                            }
+                            else{
+                                // if not waiting then in ARF, set to 0
+                                rename[i].source2_in_rob = false;
+                                // not there in rob
+                            }
+                        }
+                        //  (3) rename its destination register (if it has one)
+                        // now ahve to assign dest in rob at tail
+                        int temp_destination = rename[i].destination;
+                        rob[tail].valid = true;
+                        rob[tail].ready = false;
+                        rob[tail].destination = temp_destination;
+                        // now need to put rob number as tag to rmt
+                        if(temp_destination != invalid_value){
+                            rmt[temp_destination].valid = true;
+                            rmt[temp_destination].tag = rob[tail].number;
+                        }
+                        // need to increment tail then
+                        tail = tail + 1
                     }
                 }
             }
