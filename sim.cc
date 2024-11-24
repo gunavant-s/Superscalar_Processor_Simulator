@@ -31,6 +31,15 @@ struct RMT{  //rename map table
     uint32_t tag=0;
 };
 
+struct ROB{
+    int number = 0; // rob0,rob1 ...
+    int age; // do we need valid bit
+    int destination = 0;
+    // no mis,exe needed
+    bool ready = false;
+    uint32_t pc = 0;
+};
+
 struct IQ{  //issue queue
     bool valid = 0;
     int destination_tag = 0;
@@ -156,14 +165,43 @@ struct RT{
 
 class superscalar{
     public:
+    int head=0,tail=0; // increment whenever
     int width;
     uint64_t pc;
-    int instructions_count;
-    superscalar(int width){
+    int instructions_count=0;
+    superscalar(int width,int iq_size, int rob_size){
+        
+        rob.resize(rob_size);
+        writeback.resize(width*5);
+        execute_list.resize(width*5);
+        dispatch.resize(width);
+        issue_q.resize(iq_size);
+        reg_read.resize(width);
+        rename.resize(width);
         decode.resize(width);
     }
+    
+    vector <ROB> rob;
+    vector <RMT> rmt;
+    vector <RT> retire;
+    vector <WB> writeback;
+    vector <EX> execute_list;
+    vector <DI> dispatch;
+    vector <IS> issue_q;
+    vector <RR> reg_read;
+    vector <RN> rename;
     vector <DE> decode;
-    vector <FE> fecth;
+    // vector <FE> fetch; // not there in fetch ignore
+
+    void decode(){
+        int decode_count=0,rename_count=0;
+
+        for(int i = 0;i<width;i++){
+            if(decode[i].valid == 1){
+                decode_count+=1;
+            }
+        }
+    }
 
     void fetch(FILE *fp){
         int decode_instructions_count=0;
