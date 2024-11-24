@@ -201,12 +201,37 @@ class superscalar{
     }
     
     void decode(){
-        int decode_count=0,rename_count=0;
+        bool bundle_present = false;
+        bool rename_vacant = false;
+        int rename_count=0;
 
         for(int i = 0;i<width;i++){
             if(decode[i].valid == 1){
-                decode_count+=1;
+                bundle_present = true;
             }
+        }
+
+        if(bundle_present){
+            for(int i = 0;i < width;i++){
+                if(!rename[i].valid){
+                    rename_count+=1;
+                }
+            }
+            rename_vacant = (rename_count == width);
+
+            if (rename_vacant){
+                for(int i=0;i < width;i++){
+                    // if(rename[i].valid)
+                    rename[i].op_type = decode[i].op_type;
+                    rename[i].destination = decode[i].destination;
+                    rename[i].source1 = decode[i].source1;
+                    rename[i].source2 = decode[i].source2;
+                    rename[i].age = decode[i].age;
+                    rename[i].valid = decode[i].valid;
+                    decode[i].valid = false;                    
+                }
+            }
+            
         }
     }
 
