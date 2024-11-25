@@ -243,6 +243,10 @@ class superscalar{
         reg_read.resize(width);
         rename.resize(width);
         decode.resize(width);
+
+        for(int i = 0;i<rob_size;i++){
+            rob[i].number = i;
+        }
     }
 
     void Execute(){
@@ -493,14 +497,14 @@ class superscalar{
             if(enough_spaces_in_rob && rr_empty){
                 //Allocate entry, increment the tail and inherit the tag from rob
                 for(int i = 0;i<width;i++){
-                    if(rename[i].valid){ // only change for valid
+                    if(rename[i].valid){ // only change for valid instr
                         // now check source, destination there or not
 
                         if(rename[i].source1 != invalid_value){
                             // valid source reg
                             int temp = rename[i].source1;
                             if(rmt[temp].valid){
-                                // then it is waiting for value in pipeline
+                                // then it is waiting for value not executed
                                 rename[i].source1_in_rob = true;
                                 rename[i].source1_tag = rmt[temp].tag;
                                 // tag given to rename. for mapping
@@ -536,7 +540,7 @@ class superscalar{
                         // now need to put rob number as tag to rmt
                         if(temp_destination != invalid_value){
                             rmt[temp_destination].valid = true;
-                            rmt[temp_destination].tag = rob[tail].number;
+                            rmt[temp_destination].tag = rob[tail].number; //rob{tail number}
                         } // if no destination then do nothing
 
                         // need to increment tail then, if points to last then make it 0
