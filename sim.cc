@@ -232,10 +232,21 @@ class superscalar{
         decode.resize(width);
     }
     
+    void Dispatch(){
+        bool bundle_present = false;
+        for(int i = 0;i<width;i++){
+            if(dispatch[i].valid){
+                bundle_present = true;
+                break;
+            }
+        }
+    }
+
     void RegRead(){
         // If RR contains a register-read bundle:
         bool bundle_present = false;
         bool dispatch_empty = true;
+        int invalid_value = -1;
         
         for(int i = 0;i<width;i++){
             if(reg_read[i].valid){
@@ -261,7 +272,55 @@ class superscalar{
        if(bundle_present && dispatch_empty){
             for(int i = 0;i<width;i++){
                 if(reg_read[i].valid){
-                    
+                    // check if valid source | if not ready then set it ready
+                    int temp1 = reg_read[i].source1;
+                    if(temp1 != invalid_value){
+                        //check rmt for this source if valid then it is not executed yet
+                        // then also set ready
+                        if(rmt[temp1].valid){
+                            reg_read[i].source1_ready = true;
+                        }
+                        else{
+                            reg_read[i].source1_ready = true;
+                        }
+                        // set ready anyway. should we also set ready if no source? ask Prof
+                    }
+                    else if(temp1 == invalid_value){
+                        reg_read[i].source1_ready = true;
+                    }
+                    // same for s2
+                    int temp2 = reg_read[i].source2;
+                    if(temp2 != invalid_value){
+                        //check rmt for this source if valid then it is not executed yet
+                        // then also set ready
+                        if(rmt[temp2].valid){
+                            reg_read[i].source2_ready = true;
+                        }
+                        else{
+                            reg_read[i].source2_ready = true;
+                        }
+                        // set ready anyway. should we also set ready if no source? ask Prof
+                    }
+                    else if(temp2 == invalid_value){
+                        reg_read[i].source2_ready = true;
+                    }
+                    // process (see below) the register-read bundle and advance it from RR to DI. we look for empty place in di
+                    bool empty_spot = dispatch[i].valid;
+                    if(empty_spot){
+                        dispatch[i].age = instructions_count;
+                        dispatch[i].valid = reg_read[i].valid;
+                        dispatch[i].op_type = reg_read[i].op_type;
+                        dispatch[i].source1 = reg_read[i].source1;
+                        dispatch[i].source1_ready = true;
+                        dispatch[i].source1_tag = reg_read[i].source1_tag;
+                        dispatch[i].source1_in_rob = reg_read[i].source1_in_rob;
+                        dispatch[i].source2 = reg_read[i].source2;
+                        dispatch[i].source2_ready = true;
+                        dispatch[i].source2_tag = reg_read[i].source2_tag;
+                        dispatch[i].source2_in_rob = reg_read[i].source2_in_rob;
+                        reg_read[i].valid = false;
+                        pseudo_pipeline[instructions_count].dispatch = cycles + 1;
+                    }
                 }
             }
        }
