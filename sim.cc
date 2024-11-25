@@ -137,6 +137,7 @@ struct IS{
     int source1 = 0;
     uint32_t source1_tag=0;
     bool source1_in_rob=false;
+    bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
     uint32_t source2_tag=0;
@@ -153,6 +154,7 @@ struct EX{
     int source1 = 0;
     uint32_t source1_tag=0;
     bool source1_in_rob=false;
+    bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
     uint32_t source2_tag=0;
@@ -169,6 +171,7 @@ struct WB{
     int source1 = 0;
     uint32_t source1_tag=0;
     bool source1_in_rob=false;
+    bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
     uint32_t source2_tag=0;
@@ -185,6 +188,7 @@ struct RT{
     int source1 = 0;
     uint32_t source1_tag=0;
     bool source1_in_rob=false;
+    bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
     uint32_t source2_tag=0;
@@ -240,6 +244,49 @@ class superscalar{
                 break;
             }
         }
+        if(bundle_present){
+            int free_entries = 0;
+            bool enough_entries = false;
+            //  If the number of free IQ entries is less do nothing
+            for(int i = 0;i<iq_size;i++){
+                if(!issue_q[i].valid){
+                    free_entries += 1;
+                    if(free_entries >= width){
+                        enough_entries = true;
+                        break;
+                    }
+                }
+            }
+
+            if(enough_entries){
+                // dispatch all instructions from DI to the IQ
+                for(int i = 0;i<width;i++){
+                    if(dispatch[i].valid){
+                        for(int j = 0;j<iq_size;j++){
+                            if(!issue_q[j].valid){
+                                // empty spot found move all from DI
+                                issue_q[j].valid = true;//dispatch[i].valid;
+                                issue_q[j].op_type = dispatch[i].op_type;
+                                issue_q[j].age   = dispatch[i].age; //is instruction count == to this
+                                issue_q[j].destination = dispatch[i].destination;
+                                issue_q[j].destination_tag = dispatch[i].destination_tag;
+                                issue_q[j].source1 = dispatch[i].source1;
+                                issue_q[j].source1_in_rob = dispatch[i].source1_in_rob;
+                                issue_q[j].source1_tag = dispatch[i].source1_tag;
+                                issue_q[j].source1_ready = dispatch[i].source1_ready;
+                                issue_q[j].source2 = dispatch[i].source2;
+                                issue_q[j].source2_in_rob = dispatch[i].source2_in_rob;
+                                issue_q[j].source2_tag = dispatch[i].source2_tag;
+                                issue_q[j].source2_ready = dispatch[i].source2_ready;
+                                dispatch[i].valid = false;
+                                pseudo_pipeline[instructions_count].issue = cycles + 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
     }
 
     void RegRead(){
