@@ -4,6 +4,7 @@
 #include <inttypes.h>
 #include "sim_proc.h"
 #include <vector>
+#include <algorithm> // sorting vecotr for age in issue stage
 
 /*  argc holds the number of command line arguments
     argv[] holds the commands themselves
@@ -16,6 +17,8 @@
     argv[2] = "32"
     ... and so on
 */
+
+// FE to DI - in program order, later out of order
 
 using namespace std;
 
@@ -48,18 +51,18 @@ struct ROB{
     uint32_t pc = 0;
 };
 
-struct IQ{  //issue queue
-    bool valid = 0;
-    int destination_tag = 0;
-    bool source1_ready = false;
-    int source1_value = 0;
-    uint32_t source1_tag=0;
-    bool source1_in_rob=false;
-    bool source2_ready=false;
-    int source2_value=0;
-    uint32_t source2_tag=0;
-    bool source2_in_rob=false;
-};
+// struct IQ{  //issue queue
+//     bool valid = 0;
+//     int destination_tag = 0;
+//     bool source1_ready = false;
+//     int source1_value = 0;
+//     uint32_t source1_tag=0;
+//     bool source1_in_rob=false;
+//     bool source2_ready=false;
+//     int source2_value=0;
+//     uint32_t source2_tag=0;
+//     bool source2_in_rob=false;
+// };
 
 // fetch function not needed
 
@@ -129,7 +132,7 @@ struct DI{
     int age = 0;
 };
 
-struct IS{
+struct IQ{
     bool valid = false;
     int op_type = 0;
     int destination = 0;
@@ -159,6 +162,7 @@ struct EX{
     int source2=0;
     uint32_t source2_tag=0;
     bool source2_in_rob=false;
+    uint32_t timer = 0;
 
     int age = 0;
 };
@@ -207,15 +211,17 @@ class superscalar{
     // incrementing sequence number to each instruction as it is fetched from the trace file. instructions_count variable is there to track
     int instructions_count=0;
     vector <pipeline_entries> pseudo_pipeline;
-    // struct ROB *head_ptr; // pointer to the head of rob
-    // struct ROB *tail_ptr; // tail of rob, can;t put in struct ig
+    int OP_TYPE_0_LATENCY = 1; 
+    int OP_TYPE_1_LATENCY = 2;
+    int OP_TYPE_2_LATENCY = 5;
+
     vector <ROB> rob;
     vector <RMT> rmt;
     vector <RT> retire;
     vector <WB> writeback;
     vector <EX> execute_list;
     vector <DI> dispatch;
-    vector <IS> issue_q;
+    vector <IQ> issue_q;
     vector <RR> reg_read;
     vector <RN> rename;
     vector <DE> decode;
@@ -239,6 +245,29 @@ class superscalar{
     }
 
     void Issue(){
+        int valid_iq_counter = 0; //for tracking instr from IQ till width only  
+        int counter2 = 0;
+        vector <int> temp_iq; //for oldest to width number
+        // Issue up to WIDTH oldest instructions from the IQ
+        // head, keep on incrementing head: oldest - in rob
+        //create an array of that size(number of instructions that are valid and are ready for execution in IQ bundle)
+        //store all the valid ready elements(age parameter) in the array
+
+        for(int i = 0; i < width;i++ ){
+            if(issue_q[i].valid){
+                counter2++;
+            }
+        }
+
+        for(int i = 0;i<iq_size; i++){
+            if(issue_q[i].valid){
+                issue_q[i].source1_ready = true; // even if no source make it ready?
+                issue_q[i].source2_ready = true;
+                valid_iq_counter++;
+                temp_iq.push_back(issue_q[i].age);
+            }
+        }
+
 
     }
     
@@ -337,9 +366,9 @@ class superscalar{
                         else{
                             reg_read[i].source1_ready = true;
                         }
-                        // set ready anyway. should we also set ready if no source? ask Prof
+                        // set ready anyway. should we also set ready if no source? ask Prof: said yes or omit it
                     }
-                    else if(temp1 == invalid_value){
+                    else if(temp1 == invalid_value){ // make it truw so that it doesnt cause delay
                         reg_read[i].source1_ready = true;
                     }
                     // same for s2
@@ -412,6 +441,7 @@ class superscalar{
             bool enough_spaces_in_rob = rob_counter >= width;
 
             if(enough_spaces_in_rob && rr_empty){
+                //Allocate entry, increment the tail and inherit the tag from rob
                 for(int i = 0;i<width;i++){
                     if(rename[i].valid){ // only change for valid
                         // now check source, destination there or not
@@ -436,7 +466,7 @@ class superscalar{
                             // valid source reg
                             int temp = rename[i].source2;
                             if(rmt[temp].valid){
-                                // if there in RMT then it is waiting for value in pipeline
+                                // if there in RMT then it is waiting for value in pipeline, not commited version
                                 rename[i].source2_in_rob = true;
                                 rename[i].source2_tag = rmt[temp].tag;
                                 // tag given to rename. for mapping
@@ -460,7 +490,7 @@ class superscalar{
                         } // if no destination then do nothing
 
                         // need to increment tail then, if points to last then make it 0
-                        tail = (tail == 66)?(0):(tail + 1);
+                        tail = (tail == 66)?(0):(tail + 1); // since circular if end we start from 0
 
                         //and advance it from RN TO RR
                         reg_read[i].valid = rename[i].valid;
@@ -477,6 +507,8 @@ class superscalar{
                         reg_read[i].source2_tag = rename[i].source2_tag;
                         rename[i].valid = false;
                         pseudo_pipeline[instructions_count].reg_read = cycles + 1;
+
+                        
                     }
                 }
             }
@@ -543,7 +575,7 @@ class superscalar{
             if(decode_empty){    //if DE is empty
                 for(int i=0;i<width;i++){    //upto width only
                     fscanf(fp,"%llx %d %d %d %d\n",&pc,&op_type,&destination,&source1,&source2);
-                    instructions_count += 1;
+                    instructions_count += 1; // increase after each read from file
                     decode[i].valid = true;
                     decode[i].op_type = op_type;
                     decode[i].destination = destination;
@@ -569,6 +601,10 @@ class superscalar{
                 }
             }
         }
+    }
+
+    void Advance_Cycle(){
+
     }
     
 };
