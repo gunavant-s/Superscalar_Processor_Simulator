@@ -247,7 +247,8 @@ class superscalar{
     void Issue(){
         int valid_iq_counter = 0; //for tracking instr from IQ till width only  
         int counter2 = 0;
-        vector <int> temp_iq; //for oldest to width number
+        int min_value = width;// ta - the value can be greater or less than width. then take min of width and that counter
+        vector <int> vec; //for oldest to width number
         // Issue up to WIDTH oldest instructions from the IQ
         // head, keep on incrementing head: oldest - in rob
         //create an array of that size(number of instructions that are valid and are ready for execution in IQ bundle)
@@ -264,7 +265,27 @@ class superscalar{
                 issue_q[i].source1_ready = true; // even if no source make it ready?
                 issue_q[i].source2_ready = true;
                 valid_iq_counter++;
-                temp_iq.push_back(issue_q[i].age);
+                vec.push_back(issue_q[i].age);
+            }
+        }
+        
+        min_value = min(min_value,valid_iq_counter);
+
+        sort(vec.begin(), vec.end()); // ascending order of ages, from oldest to latest
+
+        while(valid_iq_counter < width || valid_iq_counter >= 0){
+            //1) Remove the instruction from the IQ.
+            //Add the instruction to the execute_list. and set timer based on op type
+            for(int i = 0;i<min_value;i++){
+                for(int j = 0; j<iq_size;j++){
+                    if(issue_q[j].valid){
+                        // checking if the ages same then we start transfering
+                        if(issue_q[j].age == vec[i]){
+                        
+
+                        }
+                    }
+                }
             }
         }
 
