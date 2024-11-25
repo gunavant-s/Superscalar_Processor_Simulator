@@ -203,6 +203,8 @@ class superscalar{
     int width=0,iq_size=0,rob_size=0;
     uint64_t pc = 0;
     int cycles = 0; // increases in advance cycle only
+    // One way to annotate the age of an instruction is to assign an 
+    // incrementing sequence number to each instruction as it is fetched from the trace file. instructions_count variable is there to track
     int instructions_count=0;
     vector <pipeline_entries> pseudo_pipeline;
     // struct ROB *head_ptr; // pointer to the head of rob
@@ -234,6 +236,10 @@ class superscalar{
         reg_read.resize(width);
         rename.resize(width);
         decode.resize(width);
+    }
+
+    void Issue(){
+
     }
     
     void Dispatch(){
@@ -280,6 +286,7 @@ class superscalar{
                                 issue_q[j].source2_ready = dispatch[i].source2_ready;
                                 dispatch[i].valid = false;
                                 pseudo_pipeline[instructions_count].issue = cycles + 1;
+                                break; // breaks out of for j loop since its valid now looking for another spot
                             }
                         }
                     }
@@ -566,6 +573,8 @@ class superscalar{
     
 };
 
+// One way to annotate the age of an instruction is to assign an 
+// incrementing sequence number to each instruction as it is fetched from the trace file. Instruction_count variable is there to track
 
 int main (int argc, char* argv[])
 {
