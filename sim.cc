@@ -245,7 +245,9 @@ class superscalar{
         decode.resize(width);
     }
 
-    
+    void Execute(){
+        //first find which instruction is finishing executing this cycle
+    }    
 
     void Issue(){
         int valid_iq_counter = 0; //for tracking instr from IQ till width only  
