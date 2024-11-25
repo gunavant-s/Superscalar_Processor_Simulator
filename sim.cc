@@ -234,7 +234,38 @@ class superscalar{
     
     void RegRead(){
         // If RR contains a register-read bundle:
+        bool bundle_present = false;
+        bool dispatch_empty = true;
         
+        for(int i = 0;i<width;i++){
+            if(reg_read[i].valid){
+                bundle_present = true;
+                break;
+            }
+        }
+
+        for(int i =0;i<width;i++){
+            if(dispatch[i].valid){
+                dispatch_empty = false;
+                break;
+                return;
+            }
+        }
+
+        /*
+         If DI is empty and bundle present
+        // Since values are not explicitly modeled, the sole purpose of the Register Read 
+        // stage is to ascertain the readiness of the renamed source operands. Always putting sourcei.ready = true
+        */
+
+       if(bundle_present && dispatch_empty){
+            for(int i = 0;i<width;i++){
+                if(reg_read[i].valid){
+                    
+                }
+            }
+       }
+
     }
 
     void Rename(){
@@ -313,7 +344,8 @@ class superscalar{
                         if(temp_destination != invalid_value){
                             rmt[temp_destination].valid = true;
                             rmt[temp_destination].tag = rob[tail].number;
-                        }
+                        } // if no destination then do nothing
+
                         // need to increment tail then, if points to last then make it 0
                         tail = (tail == 66)?(0):(tail + 1);
 
