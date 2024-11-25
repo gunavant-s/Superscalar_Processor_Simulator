@@ -19,6 +19,7 @@
 */
 
 // FE to DI - in program order, later out of order
+// From DI find an empty spot then transfer
 
 using namespace std;
 
@@ -204,16 +205,14 @@ struct RT{
 class superscalar{
     public:
     int head=0,tail=0; // increment whenever
-    int width=0,iq_size=0,rob_size=0;
+    int width=0,iq_size=0,rob_size=0,ex_width=0, wb_width = 0;
     uint64_t pc = 0;
     int cycles = 0; // increases in advance cycle only
     // One way to annotate the age of an instruction is to assign an 
     // incrementing sequence number to each instruction as it is fetched from the trace file. instructions_count variable is there to track
     int instructions_count=0;
     vector <pipeline_entries> pseudo_pipeline;
-    int OP_TYPE_0_LATENCY = 1; 
-    int OP_TYPE_1_LATENCY = 2;
-    int OP_TYPE_2_LATENCY = 5;
+    int OP_LATENCY [3] = {1, 2, 5};
 
     vector <ROB> rob;
     vector <RMT> rmt;
@@ -231,12 +230,14 @@ class superscalar{
         this->width = width;
         this->iq_size = iq_size;
         this->rob_size = rob_size;
+        this->ex_width = width * 5;
+        this->wb_width = width * 5;
         pseudo_pipeline.resize(100000);
         // head_ptr = &rob[0];
         // tail_ptr = &rob[0];
         rob.resize(rob_size);
-        writeback.resize(width*5);
-        execute_list.resize(width*5);
+        writeback.resize(wb_width);
+        execute_list.resize(ex_width);
         dispatch.resize(width);
         issue_q.resize(iq_size);
         reg_read.resize(width);
@@ -244,11 +245,13 @@ class superscalar{
         decode.resize(width);
     }
 
+    
+
     void Issue(){
         int valid_iq_counter = 0; //for tracking instr from IQ till width only  
         int counter2 = 0;
-        int min_value = width;// ta - the value can be greater or less than width. then take min of width and that counter
-        vector <int> vec; //for oldest to width number
+        int min_value = width;// prof - in 1 hidden run the value can be less than width. better then take min of width and that counter
+        vector <int> vec; //for oldest to width number - age
         // Issue up to WIDTH oldest instructions from the IQ
         // head, keep on incrementing head: oldest - in rob
         //create an array of that size(number of instructions that are valid and are ready for execution in IQ bundle)
@@ -279,14 +282,38 @@ class superscalar{
             for(int i = 0;i<min_value;i++){
                 for(int j = 0; j<iq_size;j++){
                     if(issue_q[j].valid){
-                        // checking if the ages same then we start transfering
-                        if(issue_q[j].age == vec[i]){
-                        
+                        // valid lets go
+                        if(issue_q[j].age == vec[i]){// checking if the ages same then we start transfering
+                            for(int k = 0;k<ex_width;k++){
+                                //finding empty place since out of order
+                                if(!execute_list[k].valid){// found empty
+                                    // removing the instruction from IQ
+                                    issue_q[j].valid = false;
+                                    // adding the instruction to ex
+                                    execute_list[k].valid = true;
+                                    execute_list[k].age = instructions_count;
+                                    execute_list[k].destination = issue_q[j].destination;
+                                    execute_list[k].destination_tag = issue_q[j].destination_tag;
+                                    execute_list[k].op_type = issue_q[j].op_type;
+                                    execute_list[k].source1 = issue_q[j].source1;
+                                    execute_list[k].source1_in_rob = issue_q[j].source1_in_rob;
+                                    execute_list[k].source1_ready = issue_q[j].source1_ready;
+                                    execute_list[k].source1_tag = issue_q[j].source1_tag;
 
+                                    execute_list[k].source2 = issue_q[j].source2;
+                                    execute_list[k].source2_in_rob = issue_q[j].source2_in_rob;
+                                    execute_list[k].source2_ready = issue_q[j].source2_ready;
+                                    execute_list[k].source2_tag = issue_q[j].source2_tag;
+                                    execute_list[k].timer = OP_LATENCY[execute_list[k].op_type]; //  will allow you to model its execution latency.
+                                    pseudo_pipeline[instructions_count].execute = cycles + 1;
+                                    break; // now searching for next free space
+                                }
+                            }
                         }
                     }
                 }
             }
+            valid_iq_counter = valid_iq_counter - 1;
         }
 
 
