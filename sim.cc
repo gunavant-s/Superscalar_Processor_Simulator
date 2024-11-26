@@ -368,6 +368,7 @@ class superscalar{
     }
     
     void Dispatch(){
+        int invalid_value = -1;
         bool bundle_present = false;
         for(int i = 0;i<width;i++){
             if(dispatch[i].valid){
