@@ -78,12 +78,12 @@ struct RN{
     uint32_t destination_tag = 0;
     int source1 = 0;
     uint32_t source1_tag=0;
-    bool source1_in_rob=false;
+    bool source1_renamed=false;
     bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
     uint32_t source2_tag=0;
-    bool source2_in_rob=false;
+    bool source2_renamed=false;
 
     int age = 0;
 };
@@ -95,12 +95,12 @@ struct RR{
     uint32_t destination_tag = 0;
     int source1 = 0;
     uint32_t source1_tag=0;
-    bool source1_in_rob=false;
+    bool source1_renamed=false;
     bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
     uint32_t source2_tag=0;
-    bool source2_in_rob=false;
+    bool source2_renamed=false;
 
     int age = 0;
 };
@@ -112,12 +112,12 @@ struct DI{
     uint32_t destination_tag = 0;
     int source1 = 0;
     uint32_t source1_tag=0;
-    bool source1_in_rob=false;
+    bool source1_renamed=false;
     bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
     uint32_t source2_tag=0;
-    bool source2_in_rob=false;
+    bool source2_renamed=false;
 
     int age = 0;
 };
@@ -129,12 +129,12 @@ struct IQ{
     uint32_t destination_tag = 0;
     int source1 = 0;
     uint32_t source1_tag=0;
-    bool source1_in_rob=false;
+    bool source1_renamed=false;
     bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
     uint32_t source2_tag=0;
-    bool source2_in_rob=false;
+    bool source2_renamed=false;
 
     int age = 0;
 };
@@ -146,12 +146,12 @@ struct EX{
     uint32_t destination_tag = 0;
     int source1 = 0;
     uint32_t source1_tag=0;
-    bool source1_in_rob=false;
+    bool source1_renamed=false;
     bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
     uint32_t source2_tag=0;
-    bool source2_in_rob=false;
+    bool source2_renamed=false;
     uint32_t timer = 0;
     // bool finished = false;
 
@@ -165,12 +165,12 @@ struct WB{
     uint32_t destination_tag = 0;
     int source1 = 0;
     uint32_t source1_tag=0;
-    bool source1_in_rob=false;
+    bool source1_renamed=false;
     bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
     uint32_t source2_tag=0;
-    bool source2_in_rob=false;
+    bool source2_renamed=false;
 
     int age = 0;
 };
@@ -182,12 +182,12 @@ struct RT{
     uint32_t destination_tag = 0;
     int source1 = 0;
     uint32_t source1_tag=0;
-    bool source1_in_rob=false;
+    bool source1_renamed=false;
     bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
     uint32_t source2_tag=0;
-    bool source2_in_rob=false;
+    bool source2_renamed=false;
 
     int age = 0;
 };
@@ -275,12 +275,12 @@ class superscalar{
                             writeback[j].destination_tag = execute_list[i].destination_tag;
                             writeback[j].op_type = execute_list[i].op_type;
                             writeback[j].source1 = execute_list[i].source1;
-                            writeback[j].source1_in_rob = execute_list[i].source1_in_rob;
+                            writeback[j].source1_renamed = execute_list[i].source1_renamed;
                             writeback[j].source1_ready = execute_list[i].source1_ready;
                             writeback[j].source1_tag = execute_list[i].source1_tag;
 
                             writeback[j].source2 = execute_list[i].source2;
-                            writeback[j].source2_in_rob = execute_list[i].source2_in_rob;
+                            writeback[j].source2_renamed = execute_list[i].source2_renamed;
                             writeback[j].source2_ready = execute_list[i].source2_ready;
                             writeback[j].source2_tag = execute_list[i].source2_tag;
                             pseudo_pipeline_stages[instructions_count].writeback = cycles + 1;
@@ -301,7 +301,7 @@ class superscalar{
                     if(execute_list[i].destination == issue_q[j].source1){ // dependent
                         if(!issue_q[j].source1_ready){ //saves time because if true then take time
                             issue_q[j].source1_ready = true; // waked source 1 yay
-                            issue_q[j].source1_in_rob = false;
+                            issue_q[j].source1_renamed = false;
                         }
                     }
                 }
@@ -312,7 +312,7 @@ class superscalar{
                     if(execute_list[i].destination == issue_q[j].source2){ // dependent
                         if(!issue_q[j].source2_ready){ //saves time because if true then take time
                             issue_q[j].source2_ready = true; // waked source 2
-                            issue_q[j].source2_in_rob = false;
+                            issue_q[j].source2_renamed = false;
                         }
                     }
                 }
@@ -324,7 +324,7 @@ class superscalar{
                     if(execute_list[i].destination == dispatch[j].source1){ // dependent
                         if(!dispatch[j].source1_ready){ //saves time because if true then take time
                             dispatch[j].source1_ready = true; // waked source 1 yay
-                            dispatch[j].source1_in_rob = false;
+                            dispatch[j].source1_renamed = false;
                         }
                     }
                 }
@@ -335,7 +335,7 @@ class superscalar{
                     if(execute_list[i].destination == dispatch[j].source2){ // dependent
                         if(!dispatch[j].source2_ready){ //saves time because if true then take time
                             dispatch[j].source2_ready = true; // waked source 2
-                            dispatch[j].source2_in_rob = false;
+                            dispatch[j].source2_renamed = false;
                         }
                     }
                 }
@@ -347,7 +347,7 @@ class superscalar{
                     if(execute_list[i].destination == reg_read[j].source1){ // dependent
                         if(!reg_read[j].source1_ready){ //saves time because if true then take time
                             reg_read[j].source1_ready = true; // waked source 1 yay
-                            reg_read[i].source1_in_rob = false;
+                            reg_read[i].source1_renamed = false;
                         }
                     }
                 }
@@ -358,7 +358,7 @@ class superscalar{
                     if(execute_list[i].destination == reg_read[j].source2){ // dependent
                         if(!reg_read[j].source2_ready){ //saves time because if true then take time
                             reg_read[j].source2_ready = true; // waked source 2
-                            reg_read[i].source2_in_rob = false;
+                            reg_read[i].source2_renamed = false;
                         }
                     }
                 }
@@ -424,11 +424,11 @@ class superscalar{
                         execute_list[k].destination_tag = issue_q[temp_index].destination_tag;
                         execute_list[k].op_type = issue_q[temp_index].op_type;
                         execute_list[k].source1 = issue_q[temp_index].source1;
-                        execute_list[k].source1_in_rob = issue_q[temp_index].source1_in_rob;
+                        execute_list[k].source1_renamed = issue_q[temp_index].source1_renamed;
                         execute_list[k].source1_ready = issue_q[temp_index].source1_ready;
                         execute_list[k].source1_tag = issue_q[temp_index].source1_tag;
                         execute_list[k].source2 = issue_q[temp_index].source2;
-                        execute_list[k].source2_in_rob = issue_q[temp_index].source2_in_rob;
+                        execute_list[k].source2_renamed = issue_q[temp_index].source2_renamed;
                         execute_list[k].source2_ready = issue_q[temp_index].source2_ready;
                         execute_list[k].source2_tag = issue_q[temp_index].source2_tag;
                         execute_list[k].timer = OP_LATENCY[execute_list[k].op_type]; //  will allow you to model its execution latency.
@@ -477,11 +477,11 @@ class superscalar{
                                 issue_q[j].destination = dispatch[i].destination;
                                 issue_q[j].destination_tag = dispatch[i].destination_tag;
                                 issue_q[j].source1 = dispatch[i].source1;
-                                issue_q[j].source1_in_rob = dispatch[i].source1_in_rob;
+                                issue_q[j].source1_renamed = dispatch[i].source1_renamed;
                                 issue_q[j].source1_tag = dispatch[i].source1_tag;
                                 issue_q[j].source1_ready = dispatch[i].source1_ready;
                                 issue_q[j].source2 = dispatch[i].source2;
-                                issue_q[j].source2_in_rob = dispatch[i].source2_in_rob;
+                                issue_q[j].source2_renamed = dispatch[i].source2_renamed;
                                 issue_q[j].source2_tag = dispatch[i].source2_tag;
                                 issue_q[j].source2_ready = dispatch[i].source2_ready;
                                 dispatch[i].valid = false; // removed instruction
@@ -548,7 +548,8 @@ class superscalar{
                         if(rmt[temp1].valid){
                             // check if destination is the source; and valid in rob and ready
                             if(rob[reg_read[i].source1_tag].valid && rob[reg_read[i].source1_tag].destination == reg_read[i].source1){
-                                if(rob[reg_read[i].source1_tag].ready){
+                                // only asserting for renamed operands
+                                if(rob[reg_read[i].source1_tag].ready && reg_read[i].source1_renamed){
                                     reg_read[i].source1_ready = true;
                                 } // by default I have put false so no else needed
                             }
@@ -592,11 +593,11 @@ class superscalar{
                         dispatch[i].source1 = reg_read[i].source1;
                         dispatch[i].source1_ready = reg_read[i].source1_ready;
                         dispatch[i].source1_tag = reg_read[i].source1_tag;
-                        dispatch[i].source1_in_rob = reg_read[i].source1_in_rob;
+                        dispatch[i].source1_renamed = reg_read[i].source1_renamed;
                         dispatch[i].source2 = reg_read[i].source2;
                         dispatch[i].source2_ready = reg_read[i].source2_ready;
                         dispatch[i].source2_tag = reg_read[i].source2_tag;
-                        dispatch[i].source2_in_rob = reg_read[i].source2_in_rob;
+                        dispatch[i].source2_renamed = reg_read[i].source2_renamed;
                         reg_read[i].valid = false; // removed instruction
                         pseudo_pipeline_stages[instructions_count].dispatch = cycles + 1;
                     }
@@ -639,25 +640,25 @@ class superscalar{
             if(enough_spaces_in_rob && rr_empty){
                 for(int i = 0;i<width;i++){
                     if(rename[i].valid){ // only change for valid instr
-                        // now check source, destination there or not
                         // now ahve to assign dest in rob at tail
                         int temp_destination = rename[i].destination;
-                        //1) allocating entry in rob via tail
+                        //1) allocating entry in rob in index tail
                         rob[tail].valid = true;
                         rob[tail].ready = false;
-                        rob[tail].destination = temp_destination;
+                        rob[tail].destination = temp_destination; // rename it even if branch but not in rmt
+                        // now check source there or not
                         // 2) renaming source registers if there; if in rmt then only can rename; save that tag in rob
                         if(rename[i].source1 != invalid_value){
                             // there
                             int temp = rename[i].source1;
                             if(rmt[temp].valid){
                                 // present in rob already, waiting for execution
-                                rename[i].source1_in_rob = true;
+                                rename[i].source1_renamed = true;
                                 rename[i].source1_tag = rmt[temp].tag;
                             }
                             else{
                                 // if not waiting then in ARF, set to 0
-                                rename[i].source1_in_rob = false;
+                                rename[i].source1_renamed = false;
                                 rename[i].source1_tag = 0;
                                 // not there in rob
                             }
@@ -667,12 +668,12 @@ class superscalar{
                             int temp = rename[i].source2;
                             if(rmt[temp].valid){
                                 // present in rob already, waiting for execution, it is waiting for value in pipeline, not commited version
-                                rename[i].source2_in_rob = true;
+                                rename[i].source2_renamed = true;
                                 rename[i].source2_tag = rmt[temp].tag;
                             }
                             else{
                                 // if not waiting then in ARF, set to 0
-                                rename[i].source2_in_rob = false;
+                                rename[i].source2_renamed = false;
                                 rename[i].source2_tag = 0;
                                 // not there in rob
                             }
@@ -684,7 +685,6 @@ class superscalar{
                             rmt[temp_destination].tag = tail;//rob[tail].number; 
                         } // if branch then do nothing
 
-                        // need to increment tail so that next instruction can use it, if points to last then make it 0
                         tail = (tail == 66)?(0):(tail + 1); // since circular if end we start from 0
 
                         //and advance it from RN TO RR
@@ -693,11 +693,11 @@ class superscalar{
                         reg_read[i].destination_tag = rename[i].destination_tag;
                         reg_read[i].op_type = rename[i].op_type;
                         reg_read[i].source1 = rename[i].source1;
-                        reg_read[i].source1_in_rob = rename[i].source1_in_rob;
+                        reg_read[i].source1_renamed = rename[i].source1_renamed;
                         reg_read[i].source1_tag = rename[i].source1_tag;
                         reg_read[i].source1_ready = rename[i].source1_ready;
                         reg_read[i].source2 = rename[i].source2;
-                        reg_read[i].source2_in_rob = rename[i].source2_in_rob;
+                        reg_read[i].source2_renamed = rename[i].source2_renamed;
                         reg_read[i].source2_ready = rename[i].source2_ready;
                         reg_read[i].source2_tag = rename[i].source2_tag;
                         rename[i].valid = false; // removed instruction
@@ -746,6 +746,9 @@ class superscalar{
                 }
             }
             
+        }
+        else{
+            return;
         }
     }
 
