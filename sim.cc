@@ -493,17 +493,23 @@ class superscalar{
        if(bundle_present && dispatch_empty){
             for(int i = 0;i<width;i++){
                 if(reg_read[i].valid){
-                    // check if valid source | if not ready then set it ready
-                    
+/*
+- For any valid source register, readiness as evaluated in RegRead() depends on two factors: 
+(1) which register file partition it was renamed to in Rename() (either the ARF -- whose committed values are always ready -- or the ROB) and
+(2) if it was renamed to the ROB (linked to a producer in the ROB), the producer's ROB entry has a ready bit that is managed by the producer (it may or may not be ready yet, depending on if and when the producer completed).
+  This evaluation of readiness based on the above two factors was exhibited in various scenarios in the detailed simulation from class.
+*/
+                    // check if valid source | if not ready then set it ready                 
                     int temp1 = reg_read[i].source1;
                     if(temp1 != invalid_value){
                         //check rmt for this source if valid then it is not executed yet
                         // then also set ready
                         if(rmt[temp1].valid){
+                            // check if destination is the source; and valid in rob and ready
                             if(rob[reg_read[i].source1_tag].valid && rob[reg_read[i].source1_tag].destination == reg_read[i].source1){
                                 if(rob[reg_read[i].source1_tag].ready){
                                     reg_read[i].source1_ready = true;
-                                } // by default i put false so no else needed
+                                } // by default I have put false so no else needed
                             }
                         }
                         else{ // not in rmt then in arf so ready
@@ -535,7 +541,7 @@ class superscalar{
                     else if(temp2 == invalid_value){
                         reg_read[i].source2_ready = true; //set anyway to avoid delay
                     }
-
+                    // from next stage onwards goes OOO so always look for empty place
                     // process (see below) the register-read bundle and advance it from RR to DI. we look for empty place in di
                     bool empty_spot = !dispatch[i].valid;
                     if(empty_spot){
@@ -543,11 +549,11 @@ class superscalar{
                         dispatch[i].valid = reg_read[i].valid;
                         dispatch[i].op_type = reg_read[i].op_type;
                         dispatch[i].source1 = reg_read[i].source1;
-                        dispatch[i].source1_ready = true;
+                        dispatch[i].source1_ready = reg_read[i].source1_ready;
                         dispatch[i].source1_tag = reg_read[i].source1_tag;
                         dispatch[i].source1_in_rob = reg_read[i].source1_in_rob;
                         dispatch[i].source2 = reg_read[i].source2;
-                        dispatch[i].source2_ready = true;
+                        dispatch[i].source2_ready = reg_read[i].source2_ready;
                         dispatch[i].source2_tag = reg_read[i].source2_tag;
                         dispatch[i].source2_in_rob = reg_read[i].source2_in_rob;
                         reg_read[i].valid = false;
