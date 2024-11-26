@@ -281,12 +281,14 @@ class superscalar{
                             writeback[j].source2_tag = execute_list[i].source2_tag;
                             pseudo_pipeline[instructions_count].writeback = cycles + 1;
                             break;
-                            
                         }
                     }
                 }
             }
         }
+
+            // Wakeup dependent instructions (set their source operand ready flags) in 
+            // the IQ, DI (the dispatch bundle), and RR (the register-read bundle)
     }    
 
     void Issue(){
@@ -316,7 +318,7 @@ class superscalar{
         
         min_value = min(min_value,valid_iq_counter);
 
-        sort(vec.begin(), vec.end()); // ascending order of ages, from oldest to latest
+        sort(vec.begin(), vec.end()); // ascending order of ages, from oldest to latest instruction
 
         while(valid_iq_counter < width || valid_iq_counter >= 0){
             //1) Remove the instruction from the IQ.
@@ -330,7 +332,8 @@ class superscalar{
                                 //finding empty place since out of order
                                 if(!execute_list[k].valid){// found empty
                                     // removing the instruction from IQ
-                                    issue_q[j].valid = false;
+                                    issue_q[j].valid = false;  // see nov 18 class at 39:30 then why valid = 0.
+                                    // after it goes to next stage it wont be in IQ
                                     // adding the instruction to ex
                                     execute_list[k].valid = true;
                                     execute_list[k].age = instructions_count;
@@ -396,12 +399,13 @@ class superscalar{
                     bool double_check = dispatch[i].source1_in_rob;
                     if(rmt[dispatch[i].source1].valid){
                         // check in rob
+                        // if valid then make source ready only if rob ready and in rob (i.e thought didnt execute yet) -> lets go true it
                         // if(dispatch[i].source1_in_rob){ // hardcode to true?
                         if(rob[dispatch[i].source1_tag].ready && double_check){
                             dispatch[i].source1_ready = true;    
                         }
                     }
-                    else{
+                    else if(!rmt[dispatch[i].source1].valid){
                         // then no source present so not waiting to execute make it true anyway
                         dispatch[i].source1_ready = true;  
                     }
@@ -413,12 +417,14 @@ class superscalar{
                     bool double_check = dispatch[i].source2_in_rob;
                     if(rmt[dispatch[i].source2].valid){
                         // check in rob
+                        // if valid then make source ready only if rob ready and in rob (i.e thought didnt execute yet) -> lets go true it
                         // if(dispatch[i].source2_in_rob){ // hardcode to true?
                         if(rob[dispatch[i].source2_tag].ready && double_check){
                             dispatch[i].source2_ready = true;    
                         }
+                        // if not waits there until execution wakes it 
                     }
-                    else{
+                    else if(!rmt[dispatch[i].source2].valid){
                         // then no source present so not waiting to execute make it true anyway
                         dispatch[i].source2_ready = true;  
                     }
@@ -488,14 +494,19 @@ class superscalar{
             for(int i = 0;i<width;i++){
                 if(reg_read[i].valid){
                     // check if valid source | if not ready then set it ready
+                    
                     int temp1 = reg_read[i].source1;
                     if(temp1 != invalid_value){
                         //check rmt for this source if valid then it is not executed yet
                         // then also set ready
                         if(rmt[temp1].valid){
-                            reg_read[i].source1_ready = true;
+                            if(rob[reg_read[i].source1_tag].valid && rob[reg_read[i].source1_tag].destination == reg_read[i].source1){
+                                if(rob[reg_read[i].source1_tag].ready){
+                                    reg_read[i].source1_ready = true;
+                                } // by default i put false so no else needed
+                            }
                         }
-                        else{
+                        else{ // not in rmt then in arf so ready
                             reg_read[i].source1_ready = true;
                         }
                         // set ready anyway. should we also set ready if no source? ask Prof: said yes or omit it
@@ -503,13 +514,18 @@ class superscalar{
                     else if(temp1 == invalid_value){ // make it truw so that it doesnt cause delay
                         reg_read[i].source1_ready = true;
                     }
+
                     // same for s2
                     int temp2 = reg_read[i].source2;
                     if(temp2 != invalid_value){
                         //check rmt for this source if valid then it is not executed yet
                         // then also set ready
                         if(rmt[temp2].valid){
-                            reg_read[i].source2_ready = true;
+                            if(rob[reg_read[i].source2_tag].valid && rob[reg_read[i].source2_tag].destination == reg_read[i].source2){
+                                if(rob[reg_read[i].source2_tag].ready){
+                                    reg_read[i].source2_ready = true;
+                                } // by default i put false so no else needed
+                            }
                         }
                         else{
                             reg_read[i].source2_ready = true;
@@ -519,6 +535,7 @@ class superscalar{
                     else if(temp2 == invalid_value){
                         reg_read[i].source2_ready = true; //set anyway to avoid delay
                     }
+
                     // process (see below) the register-read bundle and advance it from RR to DI. we look for empty place in di
                     bool empty_spot = !dispatch[i].valid;
                     if(empty_spot){
@@ -673,7 +690,7 @@ class superscalar{
                         rename[i].source2 = decode[i].source2;
                         rename[i].age = decode[i].age;
                         rename[i].valid = decode[i].valid;
-                        rename[i].source1_ready = decode[i].source1_ready;
+                        rename[i].source1_ready = decode[i].source1_ready; // default false
                         rename[i].source2_ready = decode[i].source2_ready;
                         decode[i].valid = false;
                         // rename age leda inst cont
