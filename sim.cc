@@ -221,7 +221,7 @@ class superscalar{
     vector <RT> retire;
     vector <WB> writeback;
     vector <EX> execute_list;
-    vector <DI> dispatch;
+    vector <DI> dispatch; //dount weather to check readiness
     vector <IQ> issue_q;
     vector <RR> reg_read;
     vector <RN> rename;
@@ -320,7 +320,7 @@ class superscalar{
 
         sort(vec.begin(), vec.end()); // ascending order of ages, from oldest to latest instruction
 
-        while(valid_iq_counter < width || valid_iq_counter >= 0){
+        // while(valid_iq_counter < width || valid_iq_counter >= 0){ // move until that count
             //1) Remove the instruction from the IQ.
             int temp_index = 0;
             //Add the instruction to the execute_list. and set timer based on op type
@@ -335,14 +335,16 @@ class superscalar{
                             break;
                         }
                     }
+                }
+                // now put in ex
                 for(int k = 0;k<ex_width;k++){
-                                //finding empty place since out of order
+                    //finding empty place since out of order
                     if(!execute_list[k].valid){// found empty
-                                    // removing the instruction from IQ
+                        // removing the instruction from IQ
                         issue_q[temp_index].valid = false;  // see nov 18 class at 39:30 then why valid = 0.
                         // after it goes to next stage it wont be in IQ
                         // adding the instruction to ex
-                         execute_list[k].valid = true;
+                        execute_list[k].valid = true;
                         execute_list[k].age = instructions_count;
                         execute_list[k].destination = issue_q[temp_index].destination;
                         execute_list[k].destination_tag = issue_q[temp_index].destination_tag;
@@ -361,11 +363,8 @@ class superscalar{
                         }
                     }
                 }
-            }
-            valid_iq_counter = valid_iq_counter - 1;
-        }
-
-
+            // valid_iq_counter = valid_iq_counter - 1;
+        // }
     }
     
     void Dispatch(){
@@ -431,6 +430,48 @@ class superscalar{
                     else if(!rmt[dispatch[i].source2].valid){
                         // then no source present so not waiting to execute make it true anyway
                         dispatch[i].source2_ready = true;  
+                    }
+
+                    int temp1 = reg_read[i].source1;
+                    if(temp1 != invalid_value){
+                        //check rmt for this source if valid then it is not executed yet
+                        // then also set ready
+                        if(rmt[temp1].valid){
+                            // check if destination is the source; and valid in rob and ready
+                            if(rob[reg_read[i].source1_tag].valid && rob[reg_read[i].source1_tag].destination == reg_read[i].source1){
+                                if(rob[reg_read[i].source1_tag].ready){
+                                    reg_read[i].source1_ready = true;
+                                } // by default I have put false so no else needed
+                            }
+                        }
+                        else{ // not in rmt then in arf so ready
+                            reg_read[i].source1_ready = true;
+                        }
+                        // set ready anyway. should we also set ready if no source? ask Prof: said yes or omit it
+                    }
+                    else if(temp1 == invalid_value){ // make it truw so that it doesnt cause delay
+                        reg_read[i].source1_ready = true;
+                    }
+
+                    // same for s2
+                    int temp2 = reg_read[i].source2;
+                    if(temp2 != invalid_value){
+                        //check rmt for this source if valid then it is not executed yet
+                        // then also set ready
+                        if(rmt[temp2].valid){
+                            if(rob[reg_read[i].source2_tag].valid && rob[reg_read[i].source2_tag].destination == reg_read[i].source2){
+                                if(rob[reg_read[i].source2_tag].ready){
+                                    reg_read[i].source2_ready = true;
+                                } // by default i put false so no else needed
+                            }
+                        }
+                        else{
+                            reg_read[i].source2_ready = true;
+                        }
+                        // set ready anyway. should we also set ready if no source? ask Prof
+                    }
+                    else if(temp2 == invalid_value){
+                        reg_read[i].source2_ready = true; //set anyway to avoid delay
                     }
                 }
             } // made both sources ready in iq, now just transfer to issue stage
