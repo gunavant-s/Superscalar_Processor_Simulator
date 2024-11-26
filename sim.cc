@@ -226,7 +226,6 @@ class superscalar{
     vector <RR> reg_read;
     vector <RN> rename;
     vector <DE> decode;
-    int head = 0,tail = 0;
 
     superscalar(int width,int iq_size, int rob_size){
         this->width = width;
@@ -454,32 +453,6 @@ class superscalar{
                 }
             }
 
-
-            // Readiness of each source register must be individually ascertained.  That should be the context for interpreting my previous reply.
-            // An instruction's overall readiness is evaluated by considering readiness of all its source registers.
-            
-            //if valid instruction
-            // order is rmt s1->rob s1-tag->make it ready bruh
-            // check if source valid in rmt
-            // if yes then using rob tag check if ready in rob
-            for(int i=0;i<width;i++){
-                if(dispatch[i].valid){
-                    bool double_check = dispatch[i].source1_in_rob;
-                    if(rmt[dispatch[i].source1].valid){
-                        // check in rob
-                        // if valid then make source ready only if rob ready and in rob (i.e thought didnt execute yet) -> lets go true it
-                        // if(dispatch[i].source1_in_rob){ // hardcode to true?
-                        if(rob[dispatch[i].source1_tag].ready && double_check){
-                            dispatch[i].source1_ready = true;    
-                        }
-                    }
-                    else if(!rmt[dispatch[i].source1].valid){
-                        // then no source present so not waiting to execute make it true anyway
-                        dispatch[i].source1_ready = true;  
-                    }
-                }
-            }
-
             if(enough_entries){
                 // dispatch all instructions from DI to the IQ
                 for(int i = 0;i<width;i++){
@@ -534,6 +507,7 @@ class superscalar{
         }
 
         /*
+        
          If DI is empty and bundle present
         // Since values are not explicitly modeled, the sole purpose of the Register Read 
         // stage is to ascertain the readiness of the renamed source operands. Always putting sourcei.ready = true
@@ -542,12 +516,19 @@ class superscalar{
        if(bundle_present && dispatch_empty){
             for(int i = 0;i<width;i++){
                 if(reg_read[i].valid){
-/*
-- For any valid source register, readiness as evaluated in RegRead() depends on two factors: 
-(1) which register file partition it was renamed to in Rename() (either the ARF -- whose committed values are always ready -- or the ROB) and
-(2) if it was renamed to the ROB (linked to a producer in the ROB), the producer's ROB entry has a ready bit that is managed by the producer (it may or may not be ready yet, depending on if and when the producer completed).
-  This evaluation of readiness based on the above two factors was exhibited in various scenarios in the detailed simulation from class.
-*/
+            /*
+            - For any valid source register, readiness as evaluated in RegRead() depends on two factors: 
+            (1) which register file partition it was renamed to in Rename() (either the ARF -- whose committed values are always ready -- or the ROB) and
+            (2) if it was renamed to the ROB (linked to a producer in the ROB), the producer's ROB entry has a ready bit that is managed by the producer (it may or may not be ready yet, depending on if and when the producer completed).
+            This evaluation of readiness based on the above two factors was exhibited in various scenarios in the detailed simulation from class.
+            */
+           // Readiness of each source register must be individually ascertained.  That should be the context for interpreting my previous reply.
+            // An instruction's overall readiness is evaluated by considering readiness of all its source registers.
+            //if valid instruction
+            // order is rmt s1->rob s1-tag->make it ready bruh
+            // check if source valid in rmt
+            // if yes then using rob tag check if ready in rob
+
                     // check if valid source | if not ready then set it ready                 
                     int temp1 = reg_read[i].source1;
                     if(temp1 != invalid_value){
