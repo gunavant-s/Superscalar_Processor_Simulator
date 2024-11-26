@@ -52,18 +52,6 @@ struct ROB{
     uint32_t pc = 0;
 };
 
-// struct IQ{  //issue queue
-//     bool valid = 0;
-//     int destination_tag = 0;
-//     bool source1_ready = false;
-//     int source1_value = 0;
-//     uint32_t source1_tag=0;
-//     bool source1_in_rob=false;
-//     bool source2_ready=false;
-//     int source2_value=0;
-//     uint32_t source2_tag=0;
-//     bool source2_in_rob=false;
-// };
 
 // fetch function not needed
 
@@ -72,9 +60,7 @@ struct DE{
     int op_type=0;
     int destination = 0;
     int source1 = 0;
-    int source1_rob = 0;
     int source2 = 0;
-    int source2_rob = 0;
     bool source1_ready=false;
     bool source2_ready=false;
     int age = 0;
@@ -210,9 +196,9 @@ class superscalar{
     uint64_t pc = 0;
     int reduce_latency = -1;
     int cycles = 0; // increases in advance cycle only
+    int instructions_count=0;
     // One way to annotate the age of an instruction is to assign an 
     // incrementing sequence number to each instruction as it is fetched from the trace file. instructions_count variable is there to track
-    int instructions_count=0;
     vector <pipeline_entries> pseudo_pipeline;
     int OP_LATENCY [3] = {1, 2, 5};
 
@@ -286,7 +272,7 @@ class superscalar{
             }
         }
 
-            // Wakeup dependent instructions (set their source operand ready flags) in 
+            // 3) Wakeup dependent instructions (set their source operand ready flags) in 
             // the IQ, DI (the dispatch bundle), and RR (the register-read bundle)
             // compare this->destination with that_stage->source1/2 if not ready make it ready
 
@@ -296,6 +282,7 @@ class superscalar{
                     if(execute_list[i].destination == issue_q[j].source1){ // dependent
                         if(!issue_q[j].source1_ready){ //saves time because if true then take time
                             issue_q[j].source1_ready = true; // waked source 1 yay
+                            issue_q[j].source1_in_rob = false;
                         }
                     }
                 }
@@ -306,6 +293,7 @@ class superscalar{
                     if(execute_list[i].destination == issue_q[j].source2){ // dependent
                         if(!issue_q[j].source2_ready){ //saves time because if true then take time
                             issue_q[j].source2_ready = true; // waked source 2
+                            issue_q[j].source2_in_rob = false;
                         }
                     }
                 }
@@ -317,6 +305,7 @@ class superscalar{
                     if(execute_list[i].destination == dispatch[j].source1){ // dependent
                         if(!dispatch[j].source1_ready){ //saves time because if true then take time
                             dispatch[j].source1_ready = true; // waked source 1 yay
+                            dispatch[j].source1_in_rob = false;
                         }
                     }
                 }
@@ -327,6 +316,7 @@ class superscalar{
                     if(execute_list[i].destination == dispatch[j].source2){ // dependent
                         if(!dispatch[j].source2_ready){ //saves time because if true then take time
                             dispatch[j].source2_ready = true; // waked source 2
+                            dispatch[j].source2_in_rob = false;
                         }
                     }
                 }
@@ -338,6 +328,7 @@ class superscalar{
                     if(execute_list[i].destination == reg_read[j].source1){ // dependent
                         if(!reg_read[j].source1_ready){ //saves time because if true then take time
                             reg_read[j].source1_ready = true; // waked source 1 yay
+                            reg_read[i].source1_in_rob = false;
                         }
                     }
                 }
@@ -348,10 +339,11 @@ class superscalar{
                     if(execute_list[i].destination == reg_read[j].source2){ // dependent
                         if(!reg_read[j].source2_ready){ //saves time because if true then take time
                             reg_read[j].source2_ready = true; // waked source 2
+                            reg_read[i].source2_in_rob = false;
                         }
                     }
                 }
-            } //rr waking out done
+            } //rr wakeup done
     }    
 
     void Issue(){
