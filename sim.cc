@@ -322,38 +322,42 @@ class superscalar{
 
         while(valid_iq_counter < width || valid_iq_counter >= 0){
             //1) Remove the instruction from the IQ.
+            int temp_index = 0;
             //Add the instruction to the execute_list. and set timer based on op type
             for(int i = 0;i<min_value;i++){
                 for(int j = 0; j<iq_size;j++){
                     if(issue_q[j].valid){
                         // valid lets go
-                        if(issue_q[j].age == vec[i]){// checking if the ages same then we start transfering
-                            for(int k = 0;k<ex_width;k++){
+                        if(issue_q[j].age == vec[i]){
+                            // checking if the ages same then we start transfering
+                            issue_q[j].valid = false;
+                            temp_index = j;
+                            break;
+                        }
+                    }
+                for(int k = 0;k<ex_width;k++){
                                 //finding empty place since out of order
-                                if(!execute_list[k].valid){// found empty
+                    if(!execute_list[k].valid){// found empty
                                     // removing the instruction from IQ
-                                    issue_q[j].valid = false;  // see nov 18 class at 39:30 then why valid = 0.
-                                    // after it goes to next stage it wont be in IQ
-                                    // adding the instruction to ex
-                                    execute_list[k].valid = true;
-                                    execute_list[k].age = instructions_count;
-                                    execute_list[k].destination = issue_q[j].destination;
-                                    execute_list[k].destination_tag = issue_q[j].destination_tag;
-                                    execute_list[k].op_type = issue_q[j].op_type;
-                                    execute_list[k].source1 = issue_q[j].source1;
-                                    execute_list[k].source1_in_rob = issue_q[j].source1_in_rob;
-                                    execute_list[k].source1_ready = issue_q[j].source1_ready;
-                                    execute_list[k].source1_tag = issue_q[j].source1_tag;
-
-                                    execute_list[k].source2 = issue_q[j].source2;
-                                    execute_list[k].source2_in_rob = issue_q[j].source2_in_rob;
-                                    execute_list[k].source2_ready = issue_q[j].source2_ready;
-                                    execute_list[k].source2_tag = issue_q[j].source2_tag;
-                                    execute_list[k].timer = OP_LATENCY[execute_list[k].op_type]; //  will allow you to model its execution latency.
-                                    pseudo_pipeline[instructions_count].execute = cycles + 1;
-                                    break; // now searching for next free space
-                                }
-                            }
+                        issue_q[temp_index].valid = false;  // see nov 18 class at 39:30 then why valid = 0.
+                        // after it goes to next stage it wont be in IQ
+                        // adding the instruction to ex
+                         execute_list[k].valid = true;
+                        execute_list[k].age = instructions_count;
+                        execute_list[k].destination = issue_q[temp_index].destination;
+                        execute_list[k].destination_tag = issue_q[temp_index].destination_tag;
+                        execute_list[k].op_type = issue_q[temp_index].op_type;
+                        execute_list[k].source1 = issue_q[temp_index].source1;
+                        execute_list[k].source1_in_rob = issue_q[temp_index].source1_in_rob;
+                        execute_list[k].source1_ready = issue_q[temp_index].source1_ready;
+                        execute_list[k].source1_tag = issue_q[temp_index].source1_tag;
+                        execute_list[k].source2 = issue_q[temp_index].source2;
+                        execute_list[k].source2_in_rob = issue_q[temp_index].source2_in_rob;
+                        execute_list[k].source2_ready = issue_q[temp_index].source2_ready;
+                        execute_list[k].source2_tag = issue_q[temp_index].source2_tag;
+                        execute_list[k].timer = OP_LATENCY[execute_list[k].op_type]; //  will allow you to model its execution latency.
+                        pseudo_pipeline[instructions_count].execute = cycles + 1;
+                        break; // now searching for next free space
                         }
                     }
                 }
@@ -451,7 +455,7 @@ class superscalar{
                                 issue_q[j].source2_in_rob = dispatch[i].source2_in_rob;
                                 issue_q[j].source2_tag = dispatch[i].source2_tag;
                                 issue_q[j].source2_ready = dispatch[i].source2_ready;
-                                dispatch[i].valid = false;
+                                dispatch[i].valid = false; // removed instruction
                                 pseudo_pipeline[instructions_count].issue = cycles + 1;
                                 break; // breaks out of for j loop since its valid now looking for another spot
                             }
@@ -546,7 +550,7 @@ class superscalar{
                     bool empty_spot = !dispatch[i].valid;
                     if(empty_spot){
                         dispatch[i].age = instructions_count;
-                        dispatch[i].valid = reg_read[i].valid;
+                        dispatch[i].valid = reg_read[i].valid; // true
                         dispatch[i].op_type = reg_read[i].op_type;
                         dispatch[i].source1 = reg_read[i].source1;
                         dispatch[i].source1_ready = reg_read[i].source1_ready;
@@ -556,7 +560,7 @@ class superscalar{
                         dispatch[i].source2_ready = reg_read[i].source2_ready;
                         dispatch[i].source2_tag = reg_read[i].source2_tag;
                         dispatch[i].source2_in_rob = reg_read[i].source2_in_rob;
-                        reg_read[i].valid = false;
+                        reg_read[i].valid = false; // removed instruction
                         pseudo_pipeline[instructions_count].dispatch = cycles + 1;
                     }
                 }
@@ -659,7 +663,7 @@ class superscalar{
                         reg_read[i].source2_in_rob = rename[i].source2_in_rob;
                         reg_read[i].source2_ready = rename[i].source2_ready;
                         reg_read[i].source2_tag = rename[i].source2_tag;
-                        rename[i].valid = false;
+                        rename[i].valid = false; // removed instruction
                         pseudo_pipeline[instructions_count].reg_read = cycles + 1;
                     }
                 }
