@@ -164,6 +164,7 @@ struct EX{
     uint32_t source2_tag=0;
     bool source2_in_rob=false;
     uint32_t timer = 0;
+    // bool finished = false;
 
     int age = 0;
 };
@@ -207,6 +208,7 @@ class superscalar{
     int head=0,tail=0; // increment whenever
     int width=0,iq_size=0,rob_size=0,ex_width=0, wb_width = 0;
     uint64_t pc = 0;
+    int reduce_latency = -1;
     int cycles = 0; // increases in advance cycle only
     // One way to annotate the age of an instruction is to assign an 
     // incrementing sequence number to each instruction as it is fetched from the trace file. instructions_count variable is there to track
@@ -245,12 +247,22 @@ class superscalar{
         decode.resize(width);
 
         for(int i = 0;i<rob_size;i++){
-            rob[i].number = i;
+            rob[i].number = i; //initializing rob0,rob1, indexes
         }
     }
 
     void Execute(){
         //first find which instruction is finishing executing this cycle
+        // checking if latency = 0
+        for(int i = 0;i<ex_width;i++){
+            if(execute_list[i].valid){
+                bool finished_instruction = (execute_list[i].timer == 1);
+                execute_list[i].timer = execute_list[i].timer + reduce_latency;
+                if(finished_instruction){
+                    
+                }
+            }
+        }
     }    
 
     void Issue(){
@@ -347,6 +359,48 @@ class superscalar{
                 }
             }
 
+
+            // Readiness of each source register must be individually ascertained.  That should be the context for interpreting my previous reply.
+            // An instruction's overall readiness is evaluated by considering readiness of all its source registers.
+            
+            //if valid instruction
+            // order is rmt s1->rob s1-tag->make it ready bruh
+            // check if source valid in rmt
+            // if yes then using rob tag check if ready in rob
+            for(int i=0;i<width;i++){
+                if(dispatch[i].valid){
+                    bool double_check = dispatch[i].source1_in_rob;
+                    if(rmt[dispatch[i].source1].valid){
+                        // check in rob
+                        // if(dispatch[i].source1_in_rob){ // hardcode to true?
+                        if(rob[dispatch[i].source1_tag].ready && double_check){
+                            dispatch[i].source1_ready = true;    
+                        }
+                    }
+                    else{
+                        // then no source present so not waiting to execute make it true anyway
+                        dispatch[i].source1_ready = true;  
+                    }
+                }
+            }
+
+            for(int i=0;i<width;i++){
+                if(dispatch[i].valid){
+                    bool double_check = dispatch[i].source2_in_rob;
+                    if(rmt[dispatch[i].source2].valid){
+                        // check in rob
+                        // if(dispatch[i].source2_in_rob){ // hardcode to true?
+                        if(rob[dispatch[i].source2_tag].ready && double_check){
+                            dispatch[i].source2_ready = true;    
+                        }
+                    }
+                    else{
+                        // then no source present so not waiting to execute make it true anyway
+                        dispatch[i].source2_ready = true;  
+                    }
+                }
+            } // made both sources ready in iq, now just transfer to issue stage
+
             if(enough_entries){
                 // dispatch all instructions from DI to the IQ
                 for(int i = 0;i<width;i++){
@@ -439,10 +493,10 @@ class superscalar{
                         // set ready anyway. should we also set ready if no source? ask Prof
                     }
                     else if(temp2 == invalid_value){
-                        reg_read[i].source2_ready = true;
+                        reg_read[i].source2_ready = true; //set anyway to avoid delay
                     }
                     // process (see below) the register-read bundle and advance it from RR to DI. we look for empty place in di
-                    bool empty_spot = dispatch[i].valid;
+                    bool empty_spot = !dispatch[i].valid;
                     if(empty_spot){
                         dispatch[i].age = instructions_count;
                         dispatch[i].valid = reg_read[i].valid;
@@ -499,7 +553,6 @@ class superscalar{
                 for(int i = 0;i<width;i++){
                     if(rename[i].valid){ // only change for valid instr
                         // now check source, destination there or not
-
                         if(rename[i].source1 != invalid_value){
                             // valid source reg
                             int temp = rename[i].source1;
@@ -543,7 +596,7 @@ class superscalar{
                             rmt[temp_destination].tag = rob[tail].number; //rob{tail number}
                         } // if no destination then do nothing
 
-                        // need to increment tail then, if points to last then make it 0
+                        // need to increment tail so that next instruction can use it, if points to last then make it 0
                         tail = (tail == 66)?(0):(tail + 1); // since circular if end we start from 0
 
                         //and advance it from RN TO RR
@@ -561,8 +614,6 @@ class superscalar{
                         reg_read[i].source2_tag = rename[i].source2_tag;
                         rename[i].valid = false;
                         pseudo_pipeline[instructions_count].reg_read = cycles + 1;
-
-                        
                     }
                 }
             }
