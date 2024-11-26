@@ -289,6 +289,70 @@ class superscalar{
 
             // Wakeup dependent instructions (set their source operand ready flags) in 
             // the IQ, DI (the dispatch bundle), and RR (the register-read bundle)
+            // compare this->destination with that_stage->source1/2 if not ready make it ready
+
+            //first for IQ source 1
+            for(int i = 0;i<ex_width;i++){
+                for(int j = 0;j<iq_size;j++){
+                    if(execute_list[i].destination == issue_q[j].source1){ // dependent
+                        if(!issue_q[j].source1_ready){ //saves time because if true then take time
+                            issue_q[j].source1_ready = true; // waked source 1 yay
+                        }
+                    }
+                }
+            }
+            //for IQ source 2
+            for(int i = 0;i<ex_width;i++){
+                for(int j = 0;j<iq_size;j++){
+                    if(execute_list[i].destination == issue_q[j].source2){ // dependent
+                        if(!issue_q[j].source2_ready){ //saves time because if true then take time
+                            issue_q[j].source2_ready = true; // waked source 2
+                        }
+                    }
+                }
+            } //iq waking out done
+
+            // second wakeup for DI
+            for(int i = 0;i<ex_width;i++){
+                for(int j = 0;j<width;j++){
+                    if(execute_list[i].destination == dispatch[j].source1){ // dependent
+                        if(!dispatch[j].source1_ready){ //saves time because if true then take time
+                            dispatch[j].source1_ready = true; // waked source 1 yay
+                        }
+                    }
+                }
+            }
+            //for DI source 2
+            for(int i = 0;i<ex_width;i++){
+                for(int j = 0;j<width;j++){
+                    if(execute_list[i].destination == dispatch[j].source2){ // dependent
+                        if(!dispatch[j].source2_ready){ //saves time because if true then take time
+                            dispatch[j].source2_ready = true; // waked source 2
+                        }
+                    }
+                }
+            } //di waking out done
+
+            // third wakeup for RR
+            for(int i = 0;i<ex_width;i++){
+                for(int j = 0;j<width;j++){
+                    if(execute_list[i].destination == reg_read[j].source1){ // dependent
+                        if(!reg_read[j].source1_ready){ //saves time because if true then take time
+                            reg_read[j].source1_ready = true; // waked source 1 yay
+                        }
+                    }
+                }
+            }
+            //for rr source 2
+            for(int i = 0;i<ex_width;i++){
+                for(int j = 0;j<width;j++){
+                    if(execute_list[i].destination == reg_read[j].source2){ // dependent
+                        if(!reg_read[j].source2_ready){ //saves time because if true then take time
+                            reg_read[j].source2_ready = true; // waked source 2
+                        }
+                    }
+                }
+            } //rr waking out done
     }    
 
     void Issue(){
@@ -327,7 +391,7 @@ class superscalar{
             for(int i = 0;i<min_value;i++){
                 for(int j = 0; j<iq_size;j++){
                     if(issue_q[j].valid){
-                        // valid lets go
+                        // valid lets go BRUH
                         if(issue_q[j].age == vec[i]){
                             // checking if the ages same then we start transfering
                             issue_q[j].valid = false;
@@ -415,67 +479,6 @@ class superscalar{
                     }
                 }
             }
-
-            for(int i=0;i<width;i++){
-                if(dispatch[i].valid){
-                    bool double_check = dispatch[i].source2_in_rob;
-                    if(rmt[dispatch[i].source2].valid){
-                        // check in rob
-                        // if valid then make source ready only if rob ready and in rob (i.e thought didnt execute yet) -> lets go true it
-                        // if(dispatch[i].source2_in_rob){ // hardcode to true?
-                        if(rob[dispatch[i].source2_tag].ready && double_check){
-                            dispatch[i].source2_ready = true;    
-                        }
-                        // if not waits there until execution wakes it 
-                    }
-                    else if(!rmt[dispatch[i].source2].valid){
-                        // then no source present so not waiting to execute make it true anyway
-                        dispatch[i].source2_ready = true;  
-                    }
-
-                    int temp1 = reg_read[i].source1;
-                    if(temp1 != invalid_value){
-                        //check rmt for this source if valid then it is not executed yet
-                        // then also set ready
-                        if(rmt[temp1].valid){
-                            // check if destination is the source; and valid in rob and ready
-                            if(rob[reg_read[i].source1_tag].valid && rob[reg_read[i].source1_tag].destination == reg_read[i].source1){
-                                if(rob[reg_read[i].source1_tag].ready){
-                                    reg_read[i].source1_ready = true;
-                                } // by default I have put false so no else needed
-                            }
-                        }
-                        else{ // not in rmt then in arf so ready
-                            reg_read[i].source1_ready = true;
-                        }
-                        // set ready anyway. should we also set ready if no source? ask Prof: said yes or omit it
-                    }
-                    else if(temp1 == invalid_value){ // make it truw so that it doesnt cause delay
-                        reg_read[i].source1_ready = true;
-                    }
-
-                    // same for s2
-                    int temp2 = reg_read[i].source2;
-                    if(temp2 != invalid_value){
-                        //check rmt for this source if valid then it is not executed yet
-                        // then also set ready
-                        if(rmt[temp2].valid){
-                            if(rob[reg_read[i].source2_tag].valid && rob[reg_read[i].source2_tag].destination == reg_read[i].source2){
-                                if(rob[reg_read[i].source2_tag].ready){
-                                    reg_read[i].source2_ready = true;
-                                } // by default i put false so no else needed
-                            }
-                        }
-                        else{
-                            reg_read[i].source2_ready = true;
-                        }
-                        // set ready anyway. should we also set ready if no source? ask Prof
-                    }
-                    else if(temp2 == invalid_value){
-                        reg_read[i].source2_ready = true; //set anyway to avoid delay
-                    }
-                }
-            } // made both sources ready in iq, now just transfer to issue stage
 
             if(enough_entries){
                 // dispatch all instructions from DI to the IQ
