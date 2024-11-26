@@ -259,7 +259,31 @@ class superscalar{
                 bool finished_instruction = (execute_list[i].timer == 1);
                 execute_list[i].timer = execute_list[i].timer + reduce_latency;
                 if(finished_instruction){
-                    
+                    // 1) Remove the instruction from the execute_list -> just invalid it
+                    execute_list[i].valid = false; // removed 
+                    // 2) Add the instruction to WB. Find an empty spot
+                    for(int j = 0;j<wb_width;j++){
+                        if(!writeback[j].valid){
+                            //add here
+                            writeback[j].valid = true;
+                            writeback[j].age = instructions_count; // not sure this time due to timer, maybe execut.age
+                            writeback[j].destination = execute_list[i].destination;
+                            writeback[j].destination_tag = execute_list[i].destination_tag;
+                            writeback[j].op_type = execute_list[i].op_type;
+                            writeback[j].source1 = execute_list[i].source1;
+                            writeback[j].source1_in_rob = execute_list[i].source1_in_rob;
+                            writeback[j].source1_ready = execute_list[i].source1_ready;
+                            writeback[j].source1_tag = execute_list[i].source1_tag;
+
+                            writeback[j].source2 = execute_list[i].source2;
+                            writeback[j].source2_in_rob = execute_list[i].source2_in_rob;
+                            writeback[j].source2_ready = execute_list[i].source2_ready;
+                            writeback[j].source2_tag = execute_list[i].source2_tag;
+                            pseudo_pipeline[instructions_count].writeback = cycles + 1;
+                            break;
+                            
+                        }
+                    }
                 }
             }
         }
