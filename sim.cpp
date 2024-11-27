@@ -264,7 +264,7 @@ class superscalar{
             }
         }
     }
-// printf("%d fu{%d} src{%d,%d} dst{%d} FE{%d,%d} DE{%d,%d} RN{%d,%d} RR{%d,%d} DI{%d,%d} IS{%d,%d} EX{%d,%d} WB{%d,%d} RT{%d,%d}\n",(pipeline[i].seq)-1,pipeline[i].type,pipeline[i].src1,pipeline[i].src2,pipeline[i].dest,pipeline[i].fe,(pipeline[i].de-pipeline[i].fe),pipeline[i].de,(pipeline[i].rn-pipeline[i].de),pipeline[i].rn,(pipeline[i].rr-pipeline[i].rn),pipeline[i].rr,(pipeline[i].di-pipeline[i].rr),pipeline[i].di,(pipeline[i].is-pipeline[i].di),pipeline[i].is,(pipeline[i].ex-pipeline[i].is),pipeline[i].ex,(pipeline[i].wb-pipeline[i].ex),pipeline[i].wb,(pipeline[i].rt_start-pipeline[i].wb),pipeline[i].rt_start,(pipeline[i].rt_end-pipeline[i].rt_start));
+
     void Execute(){
         //first find which instruction is finishing executing this cycle
         // checking if latency = 0
@@ -889,10 +889,10 @@ int main (int argc, char* argv[])
     params.iq_size      = strtoul(argv[2], NULL, 10);
     params.width        = strtoul(argv[3], NULL, 10);
     trace_file          = argv[4];
-    printf("rob_size:%lu "
-            "iq_size:%lu "
-            "width:%lu "
-            "tracefile:%s\n", params.rob_size, params.iq_size, params.width, trace_file);
+    // printf("rob_size:%lu "
+            // "iq_size:%lu "
+            // "width:%lu "
+            // "tracefile:%s\n", params.rob_size, params.iq_size, params.width, trace_file);
     // Open trace_file in read mode
     FP = fopen(trace_file, "r");
     if(FP == NULL)
@@ -905,6 +905,7 @@ int main (int argc, char* argv[])
     superscalar superscalar_pipeline_simulator(params.width,params.iq_size,params.rob_size);
 
     do{
+        superscalar_pipeline_simulator.Retire();
         superscalar_pipeline_simulator.Writeback();
         printf("WB done \n");
         superscalar_pipeline_simulator.Execute();
@@ -923,6 +924,20 @@ int main (int argc, char* argv[])
         printf("Fetch done\n");
     // }while(!feof(FP));
     }while(superscalar_pipeline_simulator.Advance_Cycle());
+
+    
+    float IPC = ((float)superscalar_pipeline_simulator.instructions_count/((float)superscalar_pipeline_simulator.cycles));
+    printf("# === Simulator Command =========\n");
+    //print for command ;# ./sim 16 8 1 val_trace_gcc1
+    printf("%s %s %s %s %s\n",argv[0],params.rob_size,params.iq_size,params.width);
+    printf("# === Processor Configuration ===\n");
+    printf("# ROB_SIZE  = %d\n",superscalar_pipeline_simulator.rob_size);
+    printf("# IQ_SIZE  = %d\n",superscalar_pipeline_simulator.iq_size);
+    printf("# WIDTH    = %d\n",superscalar_pipeline_simulator.width);
+    printf("# === Simulation Results ========\n");
+    printf("# Dynamic Instruction Count    = %d\n",superscalar_pipeline_simulator.instructions_count);
+    printf("# Cycles                       = %d\n",superscalar_pipeline_simulator.cycles);
+    printf("# Instructions Per Cycle (IPC) = %.2f\n",IPC);
 
 
     //
