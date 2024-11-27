@@ -250,12 +250,17 @@ class superscalar{
     void Writeback(){
         for(int i = 0;i<wb_width;i++){
             if(writeback[i].valid){
-                
+                for(int j = 0;j<rob_size;j++){
+                    if(rob[j].valid){
+                        if(rob[writeback[i].destination_tag].destination == writeback[i].destination){
+                            rob[writeback[i].destination_tag].ready = true;
+                        }
+                    }
+                }
                 // if(rmt[writeback[i].destination].valid) // if there in rmt then there in rob
                 //    rob[writeback[i].destination_tag].ready = true;
             }
         }
-
     }
 
     void Execute(){
@@ -635,7 +640,7 @@ class superscalar{
         if(bundle_present){ // // If RN contains a rename bundle: 
             //the ROB has enough free entries >= width
             int rob_counter = 0;
-            for(int i = 0;i<67;i++){
+            for(int i = 0;i<rob_size;i++){
                 if(!rob[i].valid){
                     rob_counter++;
                 }
