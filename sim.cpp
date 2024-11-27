@@ -194,6 +194,7 @@ struct RT{
 
 class superscalar{
     public:
+    bool end_of_file = false;
     int head=0,tail=0; // increment whenever
     int width=0,iq_size=0,rob_size=0,ex_width=0, wb_width = 0;
     uint64_t pc = 0;
@@ -241,15 +242,17 @@ class superscalar{
         }
     }
 
+    // Process the writeback bundle in WB: 
+    // For each instruction in WB, mark the 
+    // instruction as “ready” in its entry- then need to check destination with rob in 
+    // look slide 78->79 lol 
+    // the ROB.
     void Writeback(){
         for(int i = 0;i<wb_width;i++){
             if(writeback[i].valid){
-                if(rmt[writeback[i].destination].valid) // if there in rmt then there in rob
-                {
-                    if(!rob[writeback[i].destination_tag].ready){
-                        rob[writeback[i].destination_tag].ready = true;
-                    }
-                }
+                
+                // if(rmt[writeback[i].destination].valid) // if there in rmt then there in rob
+                //    rob[writeback[i].destination_tag].ready = true;
             }
         }
 
@@ -737,6 +740,8 @@ class superscalar{
             if (rename_vacant){
                 for(int i=0;i < width;i++){
                     if(decode[i].valid){
+                        printf("Renaming instruction %d: op_type = %d, destination = %d, source1 = %d, source2 = %d, age = %d\n",
+                        instructions_count, decode[i].op_type, decode[i].destination, decode[i].source1, decode[i].source2, decode[i].age);
                         rename[i].op_type = decode[i].op_type;
                         rename[i].destination = decode[i].destination;
                         rename[i].source1 = decode[i].source1;
@@ -758,7 +763,7 @@ class superscalar{
         }
     }
 
-    void Fetch(FILE *fp){
+    void Fetch(FILE *FP){
         bool decode_empty = true;
         int op_type = 0;
         int destination = 0;
@@ -773,10 +778,15 @@ class superscalar{
             }
         }
 
-        if(!(feof(fp))){  //instructions in trace file 
+        if(!(feof(FP))){  //instructions in trace file 
             if(decode_empty){    //if DE is empty
                 for(int i=0;i<width;i++){    //upto width only
-                    fscanf(fp,"%llx %d %d %d %d\n",&pc,&op_type,&destination,&source1,&source2);
+                    fscanf(FP,"%llx %d %d %d %d\n",&pc,&op_type,&destination,&source1,&source2);
+
+                     printf("Fetched instruction %d: pc = %08x, op_type = %d, destination = %d, source1 = %d, source2 = %d\n", 
+                    instructions_count, pc, op_type, destination, source1, source2);
+
+
                     instructions_count += 1; // increase after each read from file
                     decode[i].valid = true;
                     decode[i].op_type = op_type;
@@ -793,11 +803,17 @@ class superscalar{
                     pseudo_pipeline[instructions_count].source2 = source2;
                     pseudo_pipeline[instructions_count].destination = destination;
                     pseudo_pipeline[instructions_count].valid = true;
+                    
+                    printf("Added instruction %d to pipeline: cycles = %d, op_type = %d, source1 = %d, source2 = %d, destination = %d\n", 
+                    instructions_count, cycles, op_type, source1, source2, destination);
+                    
                     pseudo_pipeline_stages[instructions_count].fetch = cycles;
                     pseudo_pipeline_stages[instructions_count].decode = cycles + 1;
 
 
-                    if(feof(fp)){
+                    if(feof(FP)){
+                        end_of_file = true;
+                        printf("End of file reached.\n");
                         break; // no more instructions
                     }
                 }
@@ -805,8 +821,55 @@ class superscalar{
         }
     }
 
-    void Advance_Cycle(){
+    // Advance_Cycle performs several functions.  
+    // First, it advances the simulator cycle. 
+    // Second, when it becomes known that the  
+    // pipeline is empty AND the trace is depleted
+    // when is pipeline empty?
+    // when it is not empty? -> when any of pipeline registers is busy/valid?
+    // the function returns “false” to terminate 
+    // the loop.
 
+    bool Advance_Cycle(){
+        cycles++;
+        if(end_of_file){ //  trace is depleted
+            if(!(head == tail && cycles>0)){ // retire finished
+                return true;
+            }
+
+            for(int i = 0;i<width;i++){ // 4 reg
+                if(dispatch[i].valid || rename[i].valid || reg_read[i].valid || dispatch[i].valid){
+                    return true;
+                }
+            }
+
+            for(int i = 0;i<iq_size;i++){ //5 reg
+                if(issue_q[i].valid){
+                    return true;
+                }
+            }
+
+            for(int i = 0;i<ex_width;i++){ //6 reg
+                if(execute_list[i].valid){
+                    return true;
+                }
+            }
+
+            for(int i = 0;i<wb_width;i++){ // 7 reg
+                if(writeback[i].valid){
+                    return true;
+                }
+            }
+
+            for(int i = 0;i<rob_size;i++){ //8 reg checked
+                if(rob[i].valid){
+                    return true;
+                }
+            }
+            return false; // pipeline empty
+        }
+        
+        return true; //if not eof then advance
     }
     
 };
@@ -845,10 +908,27 @@ int main (int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
     // from the fetch function we read the tracefile
+    superscalar object(params.width,params.iq_size,params.rob_size);
 
-    // do{
-
-    // }while(Advance_Cycle());
+    do{
+        object.Writeback();
+        printf("WB done \n");
+        object.Execute();
+        printf("Execute done\n");
+        object.Issue();
+        printf("Issue\n");
+        object.Dispatch();
+        printf("Dispatch\n");
+        object.RegRead();
+        printf("Regread done\n");
+        object.Rename();
+        printf("Rn done\n");
+        object.Decode();
+        printf("Decode done\n");
+        object.Fetch(FP);
+        printf("Fetch done\n");
+    }while(!feof(FP));
+    // }while(object.Advance_Cycle());
 
 
     //
@@ -861,8 +941,8 @@ int main (int argc, char* argv[])
     // inside the Fetch() function.
     //
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
-    while(fscanf(FP, "%lx %d %d %d %d", &pc, &op_type, &dest, &src1, &src2) != EOF)
-        printf("%lx %d %d %d %d\n", pc, op_type, dest, src1, src2); //Print to check if inputs have been read correctly
+    // while(fscanf(FP, "%lx %d %d %d %d", &pc, &op_type, &dest, &src1, &src2) != EOF)
+    //     printf("%lx %d %d %d %d\n", pc, op_type, dest, src1, src2); //Print to check if inputs have been read correctly
 
     return 0;
 }
