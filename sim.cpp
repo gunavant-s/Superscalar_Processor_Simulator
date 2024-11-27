@@ -237,7 +237,7 @@ class superscalar{
         decode.resize(width);
 
         for(int i = 0;i<rob_size;i++){
-            rob[i].number = i; //initializing rob0,rob1, indexes
+            rob[i].number = i; //initializing rob0,rob1, indexes track back purpose
         }
     }
 
@@ -346,7 +346,7 @@ class superscalar{
                                 if(!reg_read[j].source2_ready){ //saves time because if true then take time
                                     reg_read[j].source2_ready = true; // waked source 2
                                     reg_read[i].source2_renamed = false;
-                                    }
+                                }
                             }
                         } //rr wakeup done
                     }
@@ -513,23 +513,22 @@ class superscalar{
         // Since values are not explicitly modeled, the sole purpose of the Register Read 
         // stage is to ascertain the readiness of the renamed source operands. Always putting sourcei.ready = true
         */
+       /*
+        - For any valid source register, readiness as evaluated in RegRead() depends on two factors: 
+        (1) which register file partition it was renamed to in Rename() (either the ARF -- whose committed values are always ready -- or the ROB) and
+         (2) if it was renamed to the ROB (linked to a producer in the ROB), the producer's ROB entry has a ready bit that is managed by the producer (it may or may not be ready yet, depending on if and when the producer completed).
+         This evaluation of readiness based on the above two factors was exhibited in various scenarios in the detailed simulation from class.
+         */
+        // Readiness of each source register must be individually ascertained.  That should be the context for interpreting my previous reply.
+         // An instruction's overall readiness is evaluated by considering readiness of all its source registers.
+         //if valid instruction
+        // order is rmt s1->rob s1-tag->make it ready bruh
+        // check if source valid in rmt
+        // if yes then using rob tag check if ready in rob
 
        if(bundle_present && dispatch_empty){
             for(int i = 0;i<width;i++){
                 if(reg_read[i].valid){
-            /*
-            - For any valid source register, readiness as evaluated in RegRead() depends on two factors: 
-            (1) which register file partition it was renamed to in Rename() (either the ARF -- whose committed values are always ready -- or the ROB) and
-            (2) if it was renamed to the ROB (linked to a producer in the ROB), the producer's ROB entry has a ready bit that is managed by the producer (it may or may not be ready yet, depending on if and when the producer completed).
-            This evaluation of readiness based on the above two factors was exhibited in various scenarios in the detailed simulation from class.
-            */
-           // Readiness of each source register must be individually ascertained.  That should be the context for interpreting my previous reply.
-            // An instruction's overall readiness is evaluated by considering readiness of all its source registers.
-            //if valid instruction
-            // order is rmt s1->rob s1-tag->make it ready bruh
-            // check if source valid in rmt
-            // if yes then using rob tag check if ready in rob
-
                     // check if valid source | if not ready then set it ready                 
                     int temp1 = reg_read[i].source1;
                     if(temp1 != invalid_value){
@@ -636,7 +635,8 @@ class superscalar{
                         //1) allocating entry in rob in index tail
                         rob[tail].valid = true;
                         rob[tail].ready = false;
-                        rob[tail].destination = temp_destination; // rename it even if branch but not in rmt
+                        rob[tail].destination = temp_destination; // allocate it even if no destination but not in rmt
+                        rename[i].destination_tag = rob[tail].number;
                         // now check source there or not
                         // 2) renaming source registers if there; if in rmt then only can rename; save that tag in rob
                         if(rename[i].source1 != invalid_value){
@@ -645,7 +645,7 @@ class superscalar{
                             if(rmt[temp].valid){
                                 // present in rob already, waiting for execution
                                 rename[i].source1_renamed = true;
-                                rename[i].source1_tag = rmt[temp].tag;
+                                rename[i].source1_tag = rmt[temp].tag; //tail
                             }
                             else{
                                 // if not waiting then in ARF, set to 0
@@ -673,8 +673,11 @@ class superscalar{
                         //  (3) rename its destination register (if it has one)
                         if(temp_destination != invalid_value){ //we put branch in rob but not in rmt
                             rmt[temp_destination].valid = true;
-                            rmt[temp_destination].tag = tail;//rob[tail].number; 
+                            rmt[temp_destination].tag = tail;//rob[tail].number;
+                            // rmt[temp_destination].tag = rob[tail].number;
                         } // if branch then do nothing
+
+
 
                         tail = (tail == rob_size - 1)?(0):(tail + 1); // since circular if end we start from 0
 
