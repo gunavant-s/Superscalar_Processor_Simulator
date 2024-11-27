@@ -254,6 +254,8 @@ class superscalar{
                     if(rob[j].valid){
                         if(rob[writeback[i].destination_tag].destination == writeback[i].destination){
                             rob[writeback[i].destination_tag].ready = true;
+                            rob[j].age = writeback[i].age;
+                            pseudo_pipeline_stages[rob[j].age].retire = cycles + 1;
                         }
                     }
                 }
