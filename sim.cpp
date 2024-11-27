@@ -287,82 +287,72 @@ class superscalar{
                             break;
                         }
                     }
+
+                    // 3) Wakeup dependent instructions (set their source operand ready flags) in 
+                    // the IQ, DI (the dispatch bundle), and RR (the register-read bundle)
+                    // compare this->destination with that_stage->source1/2 if not ready make it ready
+
+                    //first for IQ source 1
+                    for(int j = 0;j<iq_size;j++){
+                        if(execute_list[i].destination == issue_q[j].source1){ // dependent
+                            if(!issue_q[j].source1_ready){ //saves time because if true then take time
+                                issue_q[j].source1_ready = true; // waked source 1 yay
+                                // issue_q[j].source1_renamed = false;
+                            }
+                        }
+                    }
+                    //for IQ source 2
+                    for(int j = 0;j<iq_size;j++){
+                        if(execute_list[i].destination == issue_q[j].source2){ // dependent
+                            if(!issue_q[j].source2_ready){ //saves time because if true then take time
+                                issue_q[j].source2_ready = true; // waked source 2
+                                // issue_q[j].source2_renamed = false;
+                            }
+                        }
+                    }//iq waking out done
+
+                    // second wakeup for DI
+                    for(int j = 0;j<width;j++){
+                        if(execute_list[i].destination == dispatch[j].source1){ // dependent
+                            if(!dispatch[j].source1_ready){ //saves time because if true then take time
+                                dispatch[j].source1_ready = true; // waked source 1 yay
+                                // dispatch[j].source1_renamed = false;
+                            }
+                        }
+                    }
+                    //for DI source 2
+                    for(int j = 0;j<width;j++){
+                        if(execute_list[i].destination == dispatch[j].source2){ // dependent
+                            if(!dispatch[j].source2_ready){ //saves time because if true then take time
+                                dispatch[j].source2_ready = true; // waked source 2
+                                dispatch[j].source2_renamed = false;
+                            }
+                        }
+                    }//di waking out done
+
+                    // third wakeup for RR
+                    for(int j = 0;j<width;j++){
+                        if(execute_list[i].destination == reg_read[j].source1){ // dependent
+                            if(!reg_read[j].source1_ready){ //saves time because if true then take time
+                                reg_read[j].source1_ready = true; // waked source 1 yay
+                                reg_read[i].source1_renamed = false;
+                            }
+                        }
+                    }
+                    //for rr source 2
+                    for(int i = 0;i<ex_width;i++){
+                        for(int j = 0;j<width;j++){
+                            if(execute_list[i].destination == reg_read[j].source2){ // dependent
+                                if(!reg_read[j].source2_ready){ //saves time because if true then take time
+                                    reg_read[j].source2_ready = true; // waked source 2
+                                    reg_read[i].source2_renamed = false;
+                                    }
+                            }
+                        } //rr wakeup done
+                    }
                 }
             }
         }
-
-            // 3) Wakeup dependent instructions (set their source operand ready flags) in 
-            // the IQ, DI (the dispatch bundle), and RR (the register-read bundle)
-            // compare this->destination with that_stage->source1/2 if not ready make it ready
-
-            //first for IQ source 1
-            for(int i = 0;i<ex_width;i++){
-                for(int j = 0;j<iq_size;j++){
-                    if(execute_list[i].destination == issue_q[j].source1){ // dependent
-                        if(!issue_q[j].source1_ready){ //saves time because if true then take time
-                            issue_q[j].source1_ready = true; // waked source 1 yay
-                            issue_q[j].source1_renamed = false;
-                        }
-                    }
-                }
-            }
-            //for IQ source 2
-            for(int i = 0;i<ex_width;i++){
-                for(int j = 0;j<iq_size;j++){
-                    if(execute_list[i].destination == issue_q[j].source2){ // dependent
-                        if(!issue_q[j].source2_ready){ //saves time because if true then take time
-                            issue_q[j].source2_ready = true; // waked source 2
-                            issue_q[j].source2_renamed = false;
-                        }
-                    }
-                }
-            } //iq waking out done
-
-            // second wakeup for DI
-            for(int i = 0;i<ex_width;i++){
-                for(int j = 0;j<width;j++){
-                    if(execute_list[i].destination == dispatch[j].source1){ // dependent
-                        if(!dispatch[j].source1_ready){ //saves time because if true then take time
-                            dispatch[j].source1_ready = true; // waked source 1 yay
-                            dispatch[j].source1_renamed = false;
-                        }
-                    }
-                }
-            }
-            //for DI source 2
-            for(int i = 0;i<ex_width;i++){
-                for(int j = 0;j<width;j++){
-                    if(execute_list[i].destination == dispatch[j].source2){ // dependent
-                        if(!dispatch[j].source2_ready){ //saves time because if true then take time
-                            dispatch[j].source2_ready = true; // waked source 2
-                            dispatch[j].source2_renamed = false;
-                        }
-                    }
-                }
-            } //di waking out done
-
-            // third wakeup for RR
-            for(int i = 0;i<ex_width;i++){
-                for(int j = 0;j<width;j++){
-                    if(execute_list[i].destination == reg_read[j].source1){ // dependent
-                        if(!reg_read[j].source1_ready){ //saves time because if true then take time
-                            reg_read[j].source1_ready = true; // waked source 1 yay
-                            reg_read[i].source1_renamed = false;
-                        }
-                    }
-                }
-            }
-            //for rr source 2
-            for(int i = 0;i<ex_width;i++){
-                for(int j = 0;j<width;j++){
-                    if(execute_list[i].destination == reg_read[j].source2){ // dependent
-                        if(!reg_read[j].source2_ready){ //saves time because if true then take time
-                            reg_read[j].source2_ready = true; // waked source 2
-                            reg_read[i].source2_renamed = false;
-                        }
-                    }
-                }
-            } //rr wakeup done
     }    
 
     void Issue(){
@@ -570,7 +560,8 @@ class superscalar{
                         // then also set ready
                         if(rmt[temp2].valid){
                             if(rob[reg_read[i].source2_tag].valid && rob[reg_read[i].source2_tag].destination == reg_read[i].source2){
-                                if(rob[reg_read[i].source2_tag].ready){
+                                // only if r2 renamed
+                                if(rob[reg_read[i].source2_tag].ready && reg_read[i].source2_renamed){
                                     reg_read[i].source2_ready = true;
                                 } // by default i put false so no else needed
                             }
@@ -618,7 +609,7 @@ class superscalar{
                 break;
             }
         }
-        //  RR is empty
+        //  RR is empty assume
         bool rr_empty = true;
         for(int i = 0;i<width;i++){
             if(reg_read[i].valid){
@@ -627,7 +618,7 @@ class superscalar{
             }
         }
         
-        if(bundle_present){
+        if(bundle_present){ // // If RN contains a rename bundle: 
             //the ROB has enough free entries >= width
             int rob_counter = 0;
             for(int i = 0;i<67;i++){
@@ -685,7 +676,7 @@ class superscalar{
                             rmt[temp_destination].tag = tail;//rob[tail].number; 
                         } // if branch then do nothing
 
-                        tail = (tail == 66)?(0):(tail + 1); // since circular if end we start from 0
+                        tail = (tail == rob_size - 1)?(0):(tail + 1); // since circular if end we start from 0
 
                         //and advance it from RN TO RR
                         reg_read[i].valid = rename[i].valid;
