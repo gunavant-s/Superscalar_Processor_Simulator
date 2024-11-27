@@ -26,7 +26,7 @@ using namespace std;
 struct pipeline_entries{
     // for tracking
     // in each state increment the states cycle by 1, we can use age or instruction count?
-    // first trying with instruction count
+    // first trying with present instruction number 
     int instruction_number = 0;
     int cycles_count = 0;
     int op_type = 0;
@@ -36,25 +36,22 @@ struct pipeline_entries{
     int destination=0;
 };
 
-struct pipeline_stages{
-    int fetch=0,decode=0,rename=0,reg_read=0,dispatch=0,issue=0,execute=0,writeback=0,retire=0;
+struct pipeline_begin_cycles{
+    int fetch = 0;
+    int decode=0;
+    int rename=0;
+    int reg_read=0;
+    int dispatch=0;
+    int issue=0;
+    int execute=0;
+    int writeback = 0;
+    int retire = 0;
+    int end = 0;
+    bool end_of_instruction = false;
+    // this is for knowing the begin-cycle and duration, like which cycle
+    //for duration we can subtract by next stage begin-cycle; trying  
+    int fetch_duration=0,decode_duration=0,rename_duration=0,reg_read_duration=0,dispatch_duration=0,issue_duration=0,execute_duration=0,writeback_duration=0,retire_duration=0;
 };
-
-struct RMT{  //rename map table
-    bool valid = 0;
-    uint32_t tag=0;
-};
-
-struct ROB{
-    int rob_index = 0; // rob0,rob1 ...
-    int age; // do we need valid bit
-    int destination = 0;
-    // no mis,exe needed
-    bool ready = false;
-    bool valid = false;
-    uint32_t pc = 0;
-};
-
 
 // fetch function not needed
 
@@ -122,6 +119,20 @@ struct DI{
     int age = 0;
 };
 
+struct RMT{  //rename map table
+    bool valid = 0;
+    uint32_t tag=0;
+};
+
+struct ROB{
+    int rob_index = 0; // rob0,rob1 ...
+    int age; // do we need valid bit
+    int destination = 0;
+    // no mis,exe needed
+    bool ready = false;
+    bool valid = false;
+    uint32_t pc = 0;
+};
 struct IQ{
     bool valid = false;
     int op_type = 0;
@@ -203,16 +214,16 @@ class superscalar{
     int instructions_count=0;
     // One way to annotate the age of an instruction is to assign an 
     // incrementing sequence number to each instruction as it is fetched from the trace file. instructions_count variable is there to track
-    vector <pipeline_entries> pseudo_pipeline;
-    vector <pipeline_stages> pseudo_pipeline_stages;
+    vector <pipeline_entries> entires;
+    vector <pipeline_begin_cycles> begin_cycle;
     int OP_LATENCY [3] = {1, 2, 5};
 
-    vector <ROB> rob;
-    vector <RMT> rmt;
     vector <RT> retire;
     vector <WB> writeback;
     vector <EX> execute_list;
     vector <DI> dispatch; //dount weather to check readiness
+    vector <ROB> rob;
+    vector <RMT> rmt;
     vector <IQ> issue_q;
     vector <RR> reg_read;
     vector <RN> rename;
@@ -224,10 +235,8 @@ class superscalar{
         this->rob_size = rob_size;
         this->ex_width = width * 5;
         this->wb_width = width * 5;
-        pseudo_pipeline.resize(1000000);
-        pseudo_pipeline_stages.resize(1000000);
-        // head_ptr = &rob[0];
-        // tail_ptr = &rob[0];
+        entires.resize(1000000);
+        begin_cycle.resize(1000000);
         rob.resize(rob_size);
         writeback.resize(wb_width);
         execute_list.resize(ex_width);
@@ -249,7 +258,7 @@ class superscalar{
     // the ROB.
 
     void Retire(){
-
+        //for retire duration we need retire start and retire end since no next stage? how ?
     }
 
     void Writeback(){
@@ -261,7 +270,8 @@ class superscalar{
                             writeback[i].valid = false;
                             rob[writeback[i].destination_tag].ready = true;
                             rob[j].age = writeback[i].age;
-                            pseudo_pipeline_stages[rob[j].age].retire = cycles + 1;
+                            begin_cycle[rob[j].age].retire = cycles + 1;
+                            begin_cycle[instructions_count].writeback_duration = begin_cycle[instructions_count].retire - begin_cycle[instructions_count].writeback;
                             break;
                         }
                     }
@@ -300,7 +310,8 @@ class superscalar{
                             writeback[j].source2_renamed = execute_list[i].source2_renamed;
                             writeback[j].source2_ready = execute_list[i].source2_ready;
                             writeback[j].source2_tag = execute_list[i].source2_tag;
-                            pseudo_pipeline_stages[instructions_count].writeback = cycles + 1;
+                            begin_cycle[instructions_count].writeback = cycles + 1;
+                            begin_cycle[instructions_count].execute_duration = begin_cycle[instructions_count].writeback - begin_cycle[instructions_count].execute;
                             break;
                         }
                     }
@@ -439,7 +450,8 @@ class superscalar{
                         execute_list[k].source2_ready = issue_q[temp_index].source2_ready;
                         execute_list[k].source2_tag = issue_q[temp_index].source2_tag;
                         execute_list[k].timer = OP_LATENCY[execute_list[k].op_type]; //  will allow you to model its execution latency.
-                        pseudo_pipeline_stages[instructions_count].execute = cycles + 1;
+                        begin_cycle[instructions_count].execute = cycles + 1;
+                        begin_cycle[instructions_count].issue_duration = begin_cycle[instructions_count].execute - begin_cycle[instructions_count].issue;
                         break; // now searching for next free space
                         }
                     }
@@ -492,7 +504,8 @@ class superscalar{
                                 issue_q[j].source2_tag = dispatch[i].source2_tag;
                                 issue_q[j].source2_ready = dispatch[i].source2_ready;
                                 dispatch[i].valid = false; // removed instruction
-                                pseudo_pipeline_stages[instructions_count].issue = cycles + 1;
+                                begin_cycle[instructions_count].issue = cycles + 1;
+                                begin_cycle[instructions_count].dispatch_duration = begin_cycle[instructions_count].issue - begin_cycle[instructions_count].dispatch;
                                 break; // breaks out of for j loop since its valid now looking for another spot
                             }
                         }
@@ -605,7 +618,8 @@ class superscalar{
                         dispatch[i].source2_tag = reg_read[i].source2_tag;
                         dispatch[i].source2_renamed = reg_read[i].source2_renamed;
                         reg_read[i].valid = false; // removed instruction
-                        pseudo_pipeline_stages[instructions_count].dispatch = cycles + 1;
+                        begin_cycle[instructions_count].dispatch = cycles + 1;
+                        begin_cycle[instructions_count].reg_read_duration = begin_cycle[instructions_count].dispatch - begin_cycle[instructions_count].reg_read;
                     }
                 }
             }
@@ -711,7 +725,8 @@ class superscalar{
                         reg_read[i].source2_ready = rename[i].source2_ready;
                         reg_read[i].source2_tag = rename[i].source2_tag;
                         rename[i].valid = false; // removed instruction
-                        pseudo_pipeline_stages[instructions_count].reg_read = cycles + 1;
+                        begin_cycle[instructions_count].reg_read = cycles + 1;
+                        begin_cycle[instructions_count].rename_duration = begin_cycle[instructions_count].reg_read - begin_cycle[instructions_count].rename;
                     }
                 }
             }
@@ -753,7 +768,8 @@ class superscalar{
                         rename[i].source2_ready = decode[i].source2_ready;
                         decode[i].valid = false;
                         // rename age leda inst cont
-                        pseudo_pipeline_stages[instructions_count].rename = cycles + 1;
+                        begin_cycle[instructions_count].rename = cycles + 1;
+                        begin_cycle[instructions_count].decode_duration = begin_cycle[instructions_count].rename - begin_cycle[instructions_count].decode;
                     }                    
                 }
             }
@@ -797,19 +813,20 @@ class superscalar{
                     decode[i].age=instructions_count;
 
                     //now putting into serial pipeline
-                    pseudo_pipeline[instructions_count].instruction_number = instructions_count;
-                    pseudo_pipeline[instructions_count].cycles_count = cycles;
-                    pseudo_pipeline[instructions_count].op_type = op_type;
-                    pseudo_pipeline[instructions_count].source1 = source1;
-                    pseudo_pipeline[instructions_count].source2 = source2;
-                    pseudo_pipeline[instructions_count].destination = destination;
-                    pseudo_pipeline[instructions_count].valid = true;
+                    entires[instructions_count].instruction_number = instructions_count;
+                    entires[instructions_count].cycles_count = cycles;
+                    entires[instructions_count].op_type = op_type;
+                    entires[instructions_count].source1 = source1;
+                    entires[instructions_count].source2 = source2;
+                    entires[instructions_count].destination = destination;
+                    entires[instructions_count].valid = true;
                     
                     printf("Added instruction %d to pipeline: cycles = %d, op_type = %d, source1 = %d, source2 = %d, destination = %d\n", 
                     instructions_count, cycles, op_type, source1, source2, destination);
                     
-                    pseudo_pipeline_stages[instructions_count].fetch = cycles;
-                    pseudo_pipeline_stages[instructions_count].decode = cycles + 1;
+                    begin_cycle[instructions_count].fetch = cycles;
+                    begin_cycle[instructions_count].decode = cycles + 1;
+                    begin_cycle[instructions_count].fetch_duration = 1;
 
 
                     if(feof(FP)){
@@ -873,6 +890,35 @@ class superscalar{
         return true; //if not eof then advance
     }
     
+    void print_values(){
+        for(int i = 0;instructions_count;i++){
+            printf("%d fu{%d} src{%d,%d} dst{%d} FE{%d,%d} DE{%d,%d} RN{%d,%d} RR{%d,%d} DI{%d,%d} IS{%d,%d} EX{%d,%d} WB{%d,%d} RT{%d,%d}",
+            entires[i].instruction_number,
+            entires[i].op_type,
+            entires[i].source1,
+            entires[i].source2,
+            entires[i].destination,
+            begin_cycle[i].fetch,
+            begin_cycle[i].decode - begin_cycle[i].fetch,
+            begin_cycle[i].decode,
+            begin_cycle[i].rename,
+            begin_cycle[i].rename_duration,
+            begin_cycle[i].reg_read,
+            begin_cycle[i].reg_read_duration,
+            begin_cycle[i].dispatch,
+            begin_cycle[i].dispatch_duration,
+            begin_cycle[i].issue,
+            begin_cycle[i].issue_duration,
+            begin_cycle[i].execute,
+            begin_cycle[i].execute_duration,
+            begin_cycle[i].writeback,
+            begin_cycle[i].writeback_duration,
+            begin_cycle[i].retire,
+            begin_cycle[i].retire_duration   
+            );
+        }
+    }
+
 };
 
 // One way to annotate the age of an instruction is to assign an 
@@ -932,7 +978,13 @@ int main (int argc, char* argv[])
     // }while(!feof(FP));
     }while(superscalar_pipeline_simulator.Advance_Cycle());
 
-    
+    int count = superscalar_pipeline_simulator.instructions_count;
+
+    // vector<int> begin_cycle;
+    // begin_cycle.push_back
+
+    superscalar_pipeline_simulator.print_values();
+
     float IPC = ((float)superscalar_pipeline_simulator.instructions_count/((float)superscalar_pipeline_simulator.cycles));
     printf("# === Simulator Command =========\n");
     //print for command ;# ./sim 16 8 1 val_trace_gcc1
