@@ -244,7 +244,7 @@ class superscalar{
 
     // Process the writeback bundle in WB: 
     // For each instruction in WB, mark the 
-    // instruction as “ready” in its entry- then need to check destination with rob in 
+    // instruction as “ready” in its entry |- then need to check destination with rob in 
     // look slide 78->79 lol 
     // the ROB.
     void Writeback(){
@@ -552,12 +552,12 @@ class superscalar{
                                     break;
                                 }
                             }
-                            for(int j = 0;j<rob_size;j++){
-                                if(!rob[reg_read[i].source1_tag].valid){
-                                    reg_read[i].source1_ready = true;
-                                    break;
-                                }
-                            }
+                            // for(int j = 0;j<rob_size;j++){
+                            //     if(!rob[reg_read[i].source1_tag].valid){// not in rob
+                            //         reg_read[i].source1_ready = true;
+                            //         break;
+                            //     }
+                            // }
                         }
                         else{ // not in rmt then in arf so ready
                             reg_read[i].source1_ready = true;
@@ -580,12 +580,12 @@ class superscalar{
                                     break;
                                 }
                             }
-                            for(int j = 0;j<rob_size;j++){
-                                if(!rob[reg_read[i].source2_tag].valid){
-                                    reg_read[i].source2_ready = true;
-                                    break;
-                                }
-                            }
+                            // for(int j = 0;j<rob_size;j++){
+                            //     if(!rob[reg_read[i].source2_tag].valid){
+                            //         reg_read[i].source2_ready = true;
+                            //         break;
+                            //     }
+                            // }
                         }
                         else{
                             reg_read[i].source2_ready = true;
