@@ -46,7 +46,7 @@ struct RMT{  //rename map table
 };
 
 struct ROB{
-    int number = 0; // rob0,rob1 ...
+    int rob_index = 0; // rob0,rob1 ...
     int age; // do we need valid bit
     int destination = 0;
     // no mis,exe needed
@@ -238,7 +238,7 @@ class superscalar{
         decode.resize(width);
 
         for(int i = 0;i<rob_size;i++){
-            rob[i].number = i; //initializing rob0,rob1, indexes track back purpose
+            rob[i].rob_index = i; //initializing rob0,rob1, indexes track back purpose
         }
     }
 
@@ -249,7 +249,7 @@ class superscalar{
     // the ROB.
 
     void Retire(){
-        
+
     }
 
     void Writeback(){
@@ -257,10 +257,12 @@ class superscalar{
             if(writeback[i].valid){
                 for(int j = 0;j<rob_size;j++){
                     if(rob[j].valid){
-                        if(rob[writeback[i].destination_tag].destination == writeback[i].destination){
+                        if(rob[writeback[i].destination_tag].destination == writeback[i].destination && rob[j].rob_index == writeback[i].destination_tag){
+                            writeback[i].valid = false;
                             rob[writeback[i].destination_tag].ready = true;
                             rob[j].age = writeback[i].age;
                             pseudo_pipeline_stages[rob[j].age].retire = cycles + 1;
+                            break;
                         }
                     }
                 }
@@ -650,7 +652,7 @@ class superscalar{
                         rob[tail].valid = true;
                         rob[tail].ready = false;
                         rob[tail].destination = temp_destination; // allocate it even if no destination but not in rmt
-                        rename[i].destination_tag = rob[tail].number;
+                        rename[i].destination_tag = rob[tail].rob_index;
                         // now check source there or not
                         // 2) renaming source registers if there; if in rmt then only can rename; save that tag in rob
                         if(rename[i].source1 != invalid_value){
@@ -687,8 +689,8 @@ class superscalar{
                         //  (3) rename its destination register (if it has one)
                         if(temp_destination != invalid_value){ //we put branch in rob but not in rmt
                             rmt[temp_destination].valid = true;
-                            rmt[temp_destination].tag = tail;//rob[tail].number;
-                            // rmt[temp_destination].tag = rob[tail].number;
+                            rmt[temp_destination].tag = rob[tail].rob_index;//tail may change so using index not tail;//
+                            // rmt[temp_destination].tag = rob[tail].rob_index;
                         } // if branch then do nothing
 
 
