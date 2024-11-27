@@ -247,6 +247,11 @@ class superscalar{
     // instruction as “ready” in its entry |- then need to check destination with rob in 
     // look slide 78->79 lol 
     // the ROB.
+
+    void Retire(){
+        
+    }
+
     void Writeback(){
         for(int i = 0;i<wb_width;i++){
             if(writeback[i].valid){
