@@ -264,7 +264,7 @@ class superscalar{
             }
         }
     }
-
+// printf("%d fu{%d} src{%d,%d} dst{%d} FE{%d,%d} DE{%d,%d} RN{%d,%d} RR{%d,%d} DI{%d,%d} IS{%d,%d} EX{%d,%d} WB{%d,%d} RT{%d,%d}\n",(pipeline[i].seq)-1,pipeline[i].type,pipeline[i].src1,pipeline[i].src2,pipeline[i].dest,pipeline[i].fe,(pipeline[i].de-pipeline[i].fe),pipeline[i].de,(pipeline[i].rn-pipeline[i].de),pipeline[i].rn,(pipeline[i].rr-pipeline[i].rn),pipeline[i].rr,(pipeline[i].di-pipeline[i].rr),pipeline[i].di,(pipeline[i].is-pipeline[i].di),pipeline[i].is,(pipeline[i].ex-pipeline[i].is),pipeline[i].ex,(pipeline[i].wb-pipeline[i].ex),pipeline[i].wb,(pipeline[i].rt_start-pipeline[i].wb),pipeline[i].rt_start,(pipeline[i].rt_end-pipeline[i].rt_start));
     void Execute(){
         //first find which instruction is finishing executing this cycle
         // checking if latency = 0
@@ -583,7 +583,6 @@ class superscalar{
                     else if(temp2 == invalid_value){
                         reg_read[i].source2_ready = true; //set anyway to avoid delay
                     }
-                    // from next stage onwards goes OOO so always look for empty place
                     // process (see below) the register-read bundle and advance it from RR to DI. we look for empty place in di
                     bool empty_spot = !dispatch[i].valid;
                     if(empty_spot){
@@ -903,27 +902,27 @@ int main (int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
     // from the fetch function we read the tracefile
-    superscalar object(params.width,params.iq_size,params.rob_size);
+    superscalar superscalar_pipeline_simulator(params.width,params.iq_size,params.rob_size);
 
     do{
-        object.Writeback();
+        superscalar_pipeline_simulator.Writeback();
         printf("WB done \n");
-        object.Execute();
+        superscalar_pipeline_simulator.Execute();
         printf("Execute done\n");
-        object.Issue();
+        superscalar_pipeline_simulator.Issue();
         printf("Issue\n");
-        object.Dispatch();
+        superscalar_pipeline_simulator.Dispatch();
         printf("Dispatch\n");
-        object.RegRead();
+        superscalar_pipeline_simulator.RegRead();
         printf("Regread done\n");
-        object.Rename();
+        superscalar_pipeline_simulator.Rename();
         printf("Rn done\n");
-        object.Decode();
+        superscalar_pipeline_simulator.Decode();
         printf("Decode done\n");
-        object.Fetch(FP);
+        superscalar_pipeline_simulator.Fetch(FP);
         printf("Fetch done\n");
-    }while(!feof(FP));
-    // }while(object.Advance_Cycle());
+    // }while(!feof(FP));
+    }while(superscalar_pipeline_simulator.Advance_Cycle());
 
 
     //
