@@ -536,11 +536,17 @@ class superscalar{
                         // then also set ready
                         if(rmt[temp1].valid){
                             // check if destination is the source; and valid in rob and ready
-                            if(rob[reg_read[i].source1_tag].valid && rob[reg_read[i].source1_tag].destination == reg_read[i].source1){
-                                // only asserting for renamed operands
-                                if(rob[reg_read[i].source1_tag].ready && reg_read[i].source1_renamed){
+                            for(int j = 0;j<rob_size;j++){
+                                if(rob[reg_read[i].source1_tag].ready && (rob[j].destination == reg_read[i].source1)){
                                     reg_read[i].source1_ready = true;
-                                } // by default I have put false so no else needed
+                                    break;
+                                }
+                            }
+                            for(int j = 0;j<rob_size;j++){
+                                if(!rob[reg_read[i].source1_tag].valid){
+                                    reg_read[i].source1_ready = true;
+                                    break;
+                                }
                             }
                         }
                         else{ // not in rmt then in arf so ready
@@ -558,11 +564,11 @@ class superscalar{
                         //check rmt for this source if valid then it is not executed yet
                         // then also set ready
                         if(rmt[temp2].valid){
-                            if(rob[reg_read[i].source2_tag].valid && rob[reg_read[i].source2_tag].destination == reg_read[i].source2){
-                                // only if r2 renamed
-                                if(rob[reg_read[i].source2_tag].ready && reg_read[i].source2_renamed){
-                                    reg_read[i].source2_ready = true;
-                                } // by default i put false so no else needed
+                            for(int j = 0;j<rob_size;j++){
+                                if(rob[reg_read[i].source1_tag].ready && (rob[j].destination == temp2)){
+                                    reg_read[i].source1_ready = true;
+                                    break;
+                                }
                             }
                         }
                         else{
