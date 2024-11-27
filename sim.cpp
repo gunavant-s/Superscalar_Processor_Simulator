@@ -565,8 +565,14 @@ class superscalar{
                         // then also set ready
                         if(rmt[temp2].valid){
                             for(int j = 0;j<rob_size;j++){
-                                if(rob[reg_read[i].source1_tag].ready && (rob[j].destination == temp2)){
-                                    reg_read[i].source1_ready = true;
+                                if(rob[reg_read[i].source2_tag].ready && (rob[j].destination == temp2)){
+                                    reg_read[i].source2_ready = true;
+                                    break;
+                                }
+                            }
+                            for(int j = 0;j<rob_size;j++){
+                                if(!rob[reg_read[i].source2_tag].valid){
+                                    reg_read[i].source2_ready = true;
                                     break;
                                 }
                             }
