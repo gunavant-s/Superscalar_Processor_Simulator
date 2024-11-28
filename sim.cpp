@@ -259,6 +259,21 @@ class superscalar{
 
     void Retire(){
         //for retire duration we need retire start and retire end since no next stage? how ?
+        for(int i = head;i<head+width;i++){
+            if(rob[i].valid){
+                if(rob[i].ready){
+                    rob[i].valid = 0;
+                    head++;
+                    begin_cycle[instructions_count].end = cycles+1;
+                    entires[instructions_count].age = instructions_count;
+                    // entires[instructions_count].
+                }
+                else{
+                    break;
+                    return;
+                }
+            }
+        }
     }
 
     void Writeback(){
