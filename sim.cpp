@@ -210,6 +210,7 @@ class superscalar{
     int width=0,iq_size=0,rob_size=0,ex_width=0, wb_width = 0;
     uint64_t pc = 0;
     int reduce_latency = -1;
+    int invalid = -1;
     int cycles = 0; // increases in advance cycle only
     int instructions_count=0;
     // One way to annotate the age of an instruction is to assign an 
@@ -229,7 +230,7 @@ class superscalar{
     vector <RN> rename;
     vector <DE> decode;
 
-    superscalar(int width,int iq_size, int rob_size){
+    superscalar(int rob_size,int iq_size, int width){
         this->width = width;
         this->iq_size = iq_size;
         this->rob_size = rob_size;
@@ -259,14 +260,21 @@ class superscalar{
 
     void Retire(){
         //for retire duration we need retire start and retire end since no next stage? how ?
-        for(int i = head;i<head+width;i++){
+        int temp_head = head;
+        for(int i = temp_head;i<temp_head+width;i++){
             if(rob[i].valid){
                 if(rob[i].ready){
                     rob[i].valid = 0;
-                    head++;
-                    begin_cycle[instructions_count].end = cycles+1;
-                    entires[instructions_count].age = instructions_count;
-                    // entires[instructions_count].
+                    if(rob[i].destination != invalid){
+                        if((rmt[rob[i].destination].tag == rob[i].rob_index) && rmt[rob[i].destination].valid){
+                            rmt[rob[i].destination].valid = false;
+                        }
+                    }
+                    begin_cycle[rob[head].age].end = cycles+1;
+                    // entires[instructions_count].age = instructions_count;
+                    // entires[instructions_count].                    head++;
+                    head = (head == rob_size - 1)?0:head+1;
+
                 }
                 else{
                     break;
@@ -645,6 +653,7 @@ class superscalar{
     void Rename(){
         // If RN contains a rename bundle: 
         bool bundle_present = false;
+        int counter = 0;
         int invalid_value = -1; // if equal to this do nothing
 
         for(int i = 0;i<width;i++){
@@ -671,10 +680,11 @@ class superscalar{
                 }
             }
             bool enough_spaces_in_rob = rob_counter >= width;
-
+            // printf("Working till here\n"); // works
             if(enough_spaces_in_rob && rr_empty){
                 for(int i = 0;i<width;i++){
                     if(rename[i].valid){ // only change for valid instr
+                    printf("rename bundle : %d %d %d %d\n",rename[i].op_type,rename[i].destination,rename[i].source1,rename[i].source2);
                         // now ahve to assign dest in rob at tail
                         int temp_destination = rename[i].destination;
                         //1) allocating entry in rob in index tail
@@ -682,23 +692,32 @@ class superscalar{
                         rob[tail].ready = false;
                         rob[tail].destination = temp_destination; // allocate it even if no destination but not in rmt
                         rename[i].destination_tag = rob[tail].rob_index;
+                        // printf("%d \n",rob[tail].rob_index);
                         // now check source there or not
+                        // printf("Working till here\n"); - working
                         // 2) renaming source registers if there; if in rmt then only can rename; save that tag in rob
                         if(rename[i].source1 != invalid_value){
                             // there
                             int temp = rename[i].source1;
+                            // printf("Working till here\n"); // yes
                             if(rmt[temp].valid){
+                                // printf("Working till here\n"); - nope
                                 // present in rob already, waiting for execution
                                 rename[i].source1_renamed = true;
                                 rename[i].source1_tag = rmt[temp].tag; //tail
                             }
                             else{
                                 // if not waiting then in ARF, set to 0
+                                // printf("Working till here\n");
                                 rename[i].source1_renamed = false;
-                                rename[i].source1_tag = 0;
                                 // not there in rob
                             }
                         }
+                        else{
+                            printf("Working till here\n");
+                        }
+                        // printf("Working till here\n");
+                        // printf("Working till here\n"); -not working
                         if(rename[i].source2 != invalid_value){
                             // there
                             int temp = rename[i].source2;
@@ -710,15 +729,14 @@ class superscalar{
                             else{
                                 // if not waiting then in ARF, set to 0
                                 rename[i].source2_renamed = false;
-                                rename[i].source2_tag = 0;
                                 // not there in rob
                             }
                         }
 
                         //  (3) rename its destination register (if it has one)
                         if(temp_destination != invalid_value){ //we put branch in rob but not in rmt
-                            rmt[temp_destination].valid = true;
-                            rmt[temp_destination].tag = rob[tail].rob_index;//tail may change so using index not tail;//
+                            rmt[rob[tail].destination].valid = true;
+                            rmt[rob[tail].destination].tag = rob[tail].rob_index;//tail may change so using index not tail;//
                             // rmt[temp_destination].tag = rob[tail].rob_index;
                         } // if branch then do nothing
 
@@ -726,24 +744,29 @@ class superscalar{
 
                         tail = (tail == rob_size - 1)?(0):(tail + 1); // since circular if end we start from 0
 
-                        //and advance it from RN TO RR
-                        reg_read[i].valid = rename[i].valid;
-                        reg_read[i].destination = rename[i].destination;
-                        reg_read[i].destination_tag = rename[i].destination_tag;
-                        reg_read[i].op_type = rename[i].op_type;
-                        reg_read[i].source1 = rename[i].source1;
-                        reg_read[i].source1_renamed = rename[i].source1_renamed;
-                        reg_read[i].source1_tag = rename[i].source1_tag;
-                        reg_read[i].source1_ready = rename[i].source1_ready;
-                        reg_read[i].source2 = rename[i].source2;
-                        reg_read[i].source2_renamed = rename[i].source2_renamed;
-                        reg_read[i].source2_ready = rename[i].source2_ready;
-                        reg_read[i].source2_tag = rename[i].source2_tag;
-                        rename[i].valid = false; // removed instruction
-                        begin_cycle[instructions_count].reg_read = cycles + 1;
-                        begin_cycle[instructions_count].rename_duration = begin_cycle[instructions_count].reg_read - begin_cycle[instructions_count].rename;
+                        if(!reg_read[i].valid){
+                            //and advance it from RN TO RR
+                            reg_read[i].valid = rename[i].valid;
+                            reg_read[i].destination = rename[i].destination;
+                            reg_read[i].destination_tag = rename[i].destination_tag;
+                            reg_read[i].op_type = rename[i].op_type;
+                            reg_read[i].source1 = rename[i].source1;
+                            reg_read[i].source1_renamed = rename[i].source1_renamed;
+                            reg_read[i].source1_tag = rename[i].source1_tag;
+                            reg_read[i].source1_ready = rename[i].source1_ready;
+                            reg_read[i].source2 = rename[i].source2;
+                            reg_read[i].source2_renamed = rename[i].source2_renamed;
+                            reg_read[i].source2_ready = rename[i].source2_ready;
+                            reg_read[i].source2_tag = rename[i].source2_tag;
+                            rename[i].valid = false; // removed instruction
+                            begin_cycle[instructions_count].reg_read = cycles + 1;
+                            begin_cycle[instructions_count].rename_duration = begin_cycle[instructions_count].reg_read - begin_cycle[instructions_count].rename;
+                        }
                     }
                 }
+            }
+            else{
+                return;
             }
         }
 
@@ -770,7 +793,7 @@ class superscalar{
             // if total empty should we check if decode i valid also
             if (rename_vacant){
                 for(int i=0;i < width;i++){
-                    if(decode[i].valid){
+                    if(decode[i].valid && !rename[i].valid){
                         printf("Renaming instruction %d: op_type = %d, destination = %d, source1 = %d, source2 = %d, age = %d\n",
                         instructions_count, decode[i].op_type, decode[i].destination, decode[i].source1, decode[i].source2, decode[i].age);
                         rename[i].op_type = decode[i].op_type;
@@ -778,13 +801,14 @@ class superscalar{
                         rename[i].source1 = decode[i].source1;
                         rename[i].source2 = decode[i].source2;
                         rename[i].age = decode[i].age;
-                        rename[i].valid = decode[i].valid;
+                        rename[i].valid = true;
                         rename[i].source1_ready = decode[i].source1_ready; // default false
                         rename[i].source2_ready = decode[i].source2_ready;
                         decode[i].valid = false;
                         // rename age leda inst cont
                         begin_cycle[instructions_count].rename = cycles + 1;
                         begin_cycle[instructions_count].decode_duration = begin_cycle[instructions_count].rename - begin_cycle[instructions_count].decode;
+                        printf("rename bundle : %d %d %d %d\n",rename[i].op_type,rename[i].destination,rename[i].source1,rename[i].source2);
                     }                    
                 }
             }
@@ -866,10 +890,6 @@ class superscalar{
     bool Advance_Cycle(){
         cycles++;
         if(end_of_file){ //  trace is depleted
-            if(!(head == tail && cycles>0)){ // retire finished
-                return true;
-            }
-
             for(int i = 0;i<width;i++){ // 4 reg
                 if(dispatch[i].valid || rename[i].valid || reg_read[i].valid || dispatch[i].valid){
                     return true;
@@ -898,6 +918,10 @@ class superscalar{
                 if(rob[i].valid){
                     return true;
                 }
+            }
+
+            if(!(head == tail && cycles>0)){ // retire finished
+                return true;
             }
             return false; // pipeline empty
         }
@@ -970,10 +994,10 @@ int main (int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
     // from the fetch function we read the tracefile
-    superscalar superscalar_pipeline_simulator(params.width,params.iq_size,params.rob_size);
-
+    superscalar superscalar_pipeline_simulator(params.rob_size,params.iq_size,params.width);
     do{
         superscalar_pipeline_simulator.Retire();
+        printf("RT done \n");
         superscalar_pipeline_simulator.Writeback();
         printf("WB done \n");
         superscalar_pipeline_simulator.Execute();
@@ -992,6 +1016,8 @@ int main (int argc, char* argv[])
         printf("Fetch done\n");
     // }while(!feof(FP));
     }while(superscalar_pipeline_simulator.Advance_Cycle());
+
+    // fclose(FP);
 
     int count = superscalar_pipeline_simulator.instructions_count;
 
