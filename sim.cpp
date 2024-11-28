@@ -72,14 +72,14 @@ struct RN{
     bool valid = false;
     int op_type = 0;
     int destination = 0;
-    uint32_t destination_tag = 0;
+    uint64_t destination_tag = 0;
     int source1 = 0;
-    uint32_t source1_tag=0;
+    uint64_t source1_tag=0;
     bool source1_renamed=false;
     bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
-    uint32_t source2_tag=0;
+    uint64_t source2_tag=0;
     bool source2_renamed=false;
 
     int age = 0;
@@ -89,14 +89,14 @@ struct RR{
     bool valid = false;
     int op_type = 0;
     int destination = 0;
-    uint32_t destination_tag = 0;
+    uint64_t destination_tag = 0;
     int source1 = 0;
-    uint32_t source1_tag=0;
+    uint64_t source1_tag=0;
     bool source1_renamed=false;
     bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
-    uint32_t source2_tag=0;
+    uint64_t source2_tag=0;
     bool source2_renamed=false;
 
     int age = 0;
@@ -106,14 +106,14 @@ struct DI{
     bool valid = false;
     int op_type = 0;
     int destination = 0;
-    uint32_t destination_tag = 0;
+    uint64_t destination_tag = 0;
     int source1 = 0;
-    uint32_t source1_tag=0;
+    uint64_t source1_tag=0;
     bool source1_renamed=false;
     bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
-    uint32_t source2_tag=0;
+    uint64_t source2_tag=0;
     bool source2_renamed=false;
 
     int age = 0;
@@ -121,7 +121,7 @@ struct DI{
 
 struct RMT{  //rename map table
     bool valid = 0;
-    uint32_t tag=0;
+    uint64_t tag=0;
 };
 
 struct ROB{
@@ -131,20 +131,20 @@ struct ROB{
     // no mis,exe needed
     bool ready = false;
     bool valid = false;
-    uint32_t pc = 0;
+    uint64_t pc = 0;
 };
 struct IQ{
     bool valid = false;
     int op_type = 0;
     int destination = 0;
-    uint32_t destination_tag = 0;
+    uint64_t destination_tag = 0;
     int source1 = 0;
-    uint32_t source1_tag=0;
+    uint64_t source1_tag=0;
     bool source1_renamed=false;
     bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
-    uint32_t source2_tag=0;
+    uint64_t source2_tag=0;
     bool source2_renamed=false;
 
     int age = 0;
@@ -154,16 +154,16 @@ struct EX{
     bool valid = false;
     int op_type = 0;
     int destination = 0;
-    uint32_t destination_tag = 0;
+    uint64_t destination_tag = 0;
     int source1 = 0;
-    uint32_t source1_tag=0;
+    uint64_t source1_tag=0;
     bool source1_renamed=false;
     bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
-    uint32_t source2_tag=0;
+    uint64_t source2_tag=0;
     bool source2_renamed=false;
-    uint32_t timer = 0;
+    uint64_t timer = 0;
     // bool finished = false;
 
     int age = 0;
@@ -173,14 +173,14 @@ struct WB{
     bool valid = false;
     int op_type = 0;
     int destination = 0;
-    uint32_t destination_tag = 0;
+    uint64_t destination_tag = 0;
     int source1 = 0;
-    uint32_t source1_tag=0;
+    uint64_t source1_tag=0;
     bool source1_renamed=false;
     bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
-    uint32_t source2_tag=0;
+    uint64_t source2_tag=0;
     bool source2_renamed=false;
 
     int age = 0;
@@ -190,14 +190,14 @@ struct RT{
     bool valid = false;
     int op_type = 0;
     int destination = 0;
-    uint32_t destination_tag = 0;
+    uint64_t destination_tag = 0;
     int source1 = 0;
-    uint32_t source1_tag=0;
+    uint64_t source1_tag=0;
     bool source1_renamed=false;
     bool source1_ready=false;
     bool source2_ready=false;
     int source2=0;
-    uint32_t source2_tag=0;
+    uint64_t source2_tag=0;
     bool source2_renamed=false;
 
     int age = 0;
@@ -650,7 +650,7 @@ class superscalar{
 
     }
 
-    void Rename(){
+    void Rename(uint64_t PC){
         // If RN contains a rename bundle: 
         bool bundle_present = false;
         int counter = 0;
@@ -684,13 +684,14 @@ class superscalar{
             if(enough_spaces_in_rob && rr_empty){
                 for(int i = 0;i<width;i++){
                     if(rename[i].valid){ // only change for valid instr
-                    printf("rename bundle : %d %d %d %d\n",rename[i].op_type,rename[i].destination,rename[i].source1,rename[i].source2);
+                    printf("rename : %d %d %d %d\n",rename[i].op_type,rename[i].destination,rename[i].source1,rename[i].source2);
                         // now ahve to assign dest in rob at tail
                         int temp_destination = rename[i].destination;
                         //1) allocating entry in rob in index tail
                         rob[tail].valid = true;
                         rob[tail].ready = false;
                         rob[tail].destination = temp_destination; // allocate it even if no destination but not in rmt
+                        rob[tail].pc = PC;
                         rename[i].destination_tag = rob[tail].rob_index;
                         // printf("%d \n",rob[tail].rob_index);
                         // now check source there or not
@@ -699,7 +700,7 @@ class superscalar{
                         if(rename[i].source1 != invalid_value){
                             // there
                             int temp = rename[i].source1;
-                            // printf("Working till here\n"); // yes
+                            printf("Working till here 1 \n"); // yes
                             if(rmt[temp].valid){
                                 // printf("Working till here\n"); - nope
                                 // present in rob already, waiting for execution
@@ -712,9 +713,10 @@ class superscalar{
                                 rename[i].source1_renamed = false;
                                 // not there in rob
                             }
+                            printf("Working till here 2 \n");
                         }
                         else{
-                            printf("Working till here\n");
+                            printf("it is -1\n");
                         }
                         // printf("Working till here\n");
                         // printf("Working till here\n"); -not working
@@ -740,11 +742,9 @@ class superscalar{
                             // rmt[temp_destination].tag = rob[tail].rob_index;
                         } // if branch then do nothing
 
-
-
                         tail = (tail == rob_size - 1)?(0):(tail + 1); // since circular if end we start from 0
 
-                        if(!reg_read[i].valid){
+                        if((!reg_read[i].valid) && rename[i].valid){
                             //and advance it from RN TO RR
                             reg_read[i].valid = rename[i].valid;
                             reg_read[i].destination = rename[i].destination;
@@ -793,7 +793,7 @@ class superscalar{
             // if total empty should we check if decode i valid also
             if (rename_vacant){
                 for(int i=0;i < width;i++){
-                    if(decode[i].valid && !rename[i].valid){
+                    if(decode[i].valid && (!rename[i].valid)){
                         printf("Renaming instruction %d: op_type = %d, destination = %d, source1 = %d, source2 = %d, age = %d\n",
                         instructions_count, decode[i].op_type, decode[i].destination, decode[i].source1, decode[i].source2, decode[i].age);
                         rename[i].op_type = decode[i].op_type;
@@ -808,7 +808,7 @@ class superscalar{
                         // rename age leda inst cont
                         begin_cycle[instructions_count].rename = cycles + 1;
                         begin_cycle[instructions_count].decode_duration = begin_cycle[instructions_count].rename - begin_cycle[instructions_count].decode;
-                        printf("rename bundle : %d %d %d %d\n",rename[i].op_type,rename[i].destination,rename[i].source1,rename[i].source2);
+                        // printf("rename  : %d %d %d %d\n",rename[i].op_type,rename[i].destination,rename[i].source1,rename[i].source2);
                     }                    
                 }
             }
@@ -825,7 +825,7 @@ class superscalar{
         int destination = 0;
         int source1 = 0;
         int source2 = 0;
-        uint32_t pc = 0;
+        uint64_t pc = 0;
         int decode_instructions_count=0;
         for(int i=0;i<width;i++){
             if(decode[i].valid){
@@ -976,7 +976,7 @@ int main (int argc, char* argv[])
         printf("Error: Wrong number of inputs:%d\n", argc-1);
         exit(EXIT_FAILURE);
     }
-    
+    pc                  = strtoul(argv[0], NULL, 10);
     params.rob_size     = strtoul(argv[1], NULL, 10);
     params.iq_size      = strtoul(argv[2], NULL, 10);
     params.width        = strtoul(argv[3], NULL, 10);
@@ -1008,13 +1008,12 @@ int main (int argc, char* argv[])
         printf("Dispatch\n");
         superscalar_pipeline_simulator.RegRead();
         printf("Regread done\n");
-        superscalar_pipeline_simulator.Rename();
+        superscalar_pipeline_simulator.Rename(pc);
         printf("Rn done\n");
         superscalar_pipeline_simulator.Decode();
         printf("Decode done\n");
         superscalar_pipeline_simulator.Fetch(FP);
         printf("Fetch done\n");
-    // }while(!feof(FP));
     }while(superscalar_pipeline_simulator.Advance_Cycle());
 
     // fclose(FP);
