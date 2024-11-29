@@ -623,18 +623,18 @@ class superscalar{
                         if(rmt[temp1].valid){
                             // check if destination is the source; and valid in rob and ready
                             for(int j = 0;j<rob_size;j++){
-                                if(rob[j].valid && rob[reg_read[i].source1_tag].ready && (rob[j].destination == reg_read[i].source1 && rob[j].ready && reg_read[i].source1_renamed)){
+                                if(rob[j].valid && rob[reg_read[i].source1_tag].ready && (rob[j].destination == reg_read[i].source1 && reg_read[i].source1_renamed)){
                                     reg_read[i].source1_ready = true;
                                     break;
                                 }
                             }
                         }
-                        // else{ // not in rmt then in arf so ready
-                        //     reg_read[i].source1_ready = true;
-                        // }
+                        else{ // not in rmt then in arf so ready
+                            reg_read[i].source1_ready = true;
+                        }
                         // set ready anyway. should we also set ready if no source? ask Prof: said yes or omit it
                     }
-                    else if(temp1 == invalid_value){ // make it truw so that it doesnt cause delay
+                    else{ // make it truw so that it doesnt cause delay
                         reg_read[i].source1_ready = true;
                     }
 
@@ -777,6 +777,7 @@ class superscalar{
                             else{
                                 // if not waiting then in ARF, set to 0
                                 rename[i].source2_renamed = false;
+                                rename[i].source1_ready = true;
                                 rename[i].source2_tag = -1;
                                 // not there in rob
                             }
