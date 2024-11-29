@@ -362,9 +362,9 @@ class superscalar{
         // checking if latency = 0
         for(int i = 0;i<ex_width;i++){
             if(execute_list[i].valid){
-                // if(execute_list[i].timer > 0) {
-                execute_list[i].timer--;
-                // }
+                if(execute_list[i].timer > 0) {
+                    execute_list[i].timer--;
+                }
                 if(execute_list[i].timer == 0){
                     // 1) Remove the instruction from the execute_list -> just invalid it
                     execute_list[i].valid = false; // removed 
@@ -397,38 +397,40 @@ class superscalar{
                     // compare this->destination with that_stage->source1/2 if not ready make it ready
                     int completing_tag = execute_list[i].destination_tag;
                     //first for IQ source 1
-                    for(int j = 0; j < iq_size; j++) {
-                        if(issue_q[j].valid) {
-                            if(issue_q[j].source1_renamed && issue_q[j].source1_tag == completing_tag) {
-                                issue_q[j].source1_ready = true;
+                    if(execute_list[i].destination != -1){
+                        for(int j = 0; j < iq_size; j++) {
+                            if(issue_q[j].valid) {
+                                if(issue_q[j].source1_renamed && issue_q[j].source1_tag == completing_tag && !issue_q[j].source1_ready) {
+                                    issue_q[j].source1_ready = true;
+                                }
+                                if(issue_q[j].source2_renamed && issue_q[j].source2_tag == completing_tag && !issue_q[j].source2_ready) {
+                                    issue_q[j].source2_ready = true;
+                                }
                             }
-                            if(issue_q[j].source2_renamed && issue_q[j].source2_tag == completing_tag) {
-                                issue_q[j].source2_ready = true;
-                            }
-                        }
-                    }//iq waking out done
+                        }//iq waking out done
 
-                    for(int j = 0; j < width; j++) {
-                        if(dispatch[j].valid) {
-                            if(dispatch[j].source1_renamed && dispatch[j].source1_tag == completing_tag) {
-                                dispatch[j].source1_ready = true;
+                        for(int j = 0; j < width; j++) {
+                            if(dispatch[j].valid) {
+                                if(dispatch[j].source1_renamed && dispatch[j].source1_tag == completing_tag) {
+                                    dispatch[j].source1_ready = true;
+                                }
+                                if(dispatch[j].source2_renamed && dispatch[j].source2_tag == completing_tag) {
+                                    dispatch[j].source2_ready = true;
+                                }
                             }
-                            if(dispatch[j].source2_renamed && dispatch[j].source2_tag == completing_tag) {
-                                dispatch[j].source2_ready = true;
-                            }
-                        }
-                    } // di waking up done
+                        } // di waking up done
 
-                    for(int j = 0; j < width; j++) {
-                        if(reg_read[j].valid) {
-                            if(reg_read[j].source1_renamed && reg_read[j].source1_tag == completing_tag) {
-                                reg_read[j].source1_ready = true;
+                        for(int j = 0; j < width; j++) {
+                            if(reg_read[j].valid) {
+                                if(reg_read[j].source1_renamed && reg_read[j].source1_tag == completing_tag) {
+                                    reg_read[j].source1_ready = true;
+                                }
+                                if(reg_read[j].source2_renamed && reg_read[j].source2_tag == completing_tag) {
+                                    reg_read[j].source2_ready = true;
+                                }
                             }
-                            if(reg_read[j].source2_renamed && reg_read[j].source2_tag == completing_tag) {
-                                reg_read[j].source2_ready = true;
-                            }
-                        }
-                    } // reg read
+                        } // reg read
+                    }
                 }
             }
         }
@@ -436,7 +438,7 @@ class superscalar{
 
     void Issue(){
         int valid_iq_counter = 0; //for tracking instr from IQ till width only  
-        int counter2 = 0;
+        // int counter2 = 0;
         int min_value = width;// prof - in 1 hidden run the value can be less than width. better then take min of width and that counter
         vector <int> vec; //for oldest to width number - age
         // Issue up to WIDTH oldest instructions from the IQ
@@ -444,22 +446,22 @@ class superscalar{
         //create an array of that size(number of instructions that are valid and are ready for execution in IQ bundle)
         //store all the valid ready elements(age parameter) in the array
 
-        for(int i = 0; i < width;i++ ){
-            if(issue_q[i].valid){
-                counter2++;
-            }
-        }
+        // for(int i = 0; i < width;i++ ){
+        //     if(issue_q[i].valid){
+        //         counter2++;
+        //     }
+        // }
 
         for(int i = 0;i<iq_size; i++){
             if(issue_q[i].valid){
-                issue_q[i].source1_ready = true; // even if no source make it ready?
-                issue_q[i].source2_ready = true;
-                valid_iq_counter++;
-                vec.push_back(issue_q[i].age);
+                if(issue_q[i].source2_ready && issue_q[i].source1_ready){
+                    valid_iq_counter++;
+                    vec.push_back(issue_q[i].age);
+                }
             }
         }
         
-        min_value = min(min_value,valid_iq_counter);
+        min_value = min(width,valid_iq_counter);
 
         sort(vec.begin(), vec.end()); // ascending order of ages, from oldest to latest instruction
 
@@ -471,37 +473,40 @@ class superscalar{
                 for(int j = 0; j<iq_size;j++){
                     if(issue_q[j].valid && issue_q[j].age == vec[i]){
                             // checking if the ages same then we start transfering
-                            issue_q[j].valid = false;
+                            // issue_q[j].valid = false;
                             temp_index = j;
                             break;
                         }
                 }
                 // now put in ex
-                for(int k = 0;k<ex_width;k++){
-                    //finding empty place since out of order
-                    if(!execute_list[k].valid){// found empty
-                        // removing the instruction from IQ
-                        issue_q[temp_index].valid = false;  // see nov 18 class at 39:30 then why valid = 0.
-                        // after it goes to next stage it wont be in IQ
-                        // adding the instruction to ex
-                        execute_list[k].valid = true;
-                        execute_list[k].age = issue_q[temp_index].age;
+                if(issue_q[temp_index].valid){
+                    issue_q[temp_index].valid = false; 
+                    for(int k = 0;k<ex_width;k++){
+                        //finding empty place since out of order
+                        if(!execute_list[k].valid){// found empty
+                            // removing the instruction from IQ
+                             // see nov 18 class at 39:30 then why valid = 0.
+                            // after it goes to next stage it wont be in IQ
+                            // adding the instruction to ex
+                            execute_list[k].valid = true;
+                            execute_list[k].age = issue_q[temp_index].age;
 
-                        execute_list[k].destination = issue_q[temp_index].destination;
-                        execute_list[k].destination_tag = issue_q[temp_index].destination_tag;
-                        execute_list[k].op_type = issue_q[temp_index].op_type;
-                        execute_list[k].source1 = issue_q[temp_index].source1;
-                        execute_list[k].source1_renamed = issue_q[temp_index].source1_renamed;
-                        execute_list[k].source1_ready = issue_q[temp_index].source1_ready;
-                        execute_list[k].source1_tag = issue_q[temp_index].source1_tag;
-                        execute_list[k].source2 = issue_q[temp_index].source2;
-                        execute_list[k].source2_renamed = issue_q[temp_index].source2_renamed;
-                        execute_list[k].source2_ready = issue_q[temp_index].source2_ready;
-                        execute_list[k].source2_tag = issue_q[temp_index].source2_tag;
-                        execute_list[k].timer = OP_LATENCY[execute_list[k].op_type]; //  will allow you to model its execution latency.
-                        begin_cycle[issue_q[temp_index].age].execute = cycles + 1;
-                        begin_cycle[issue_q[temp_index].age].issue_duration = begin_cycle[issue_q[temp_index].age].execute - begin_cycle[issue_q[temp_index].age].issue;
-                        break; // now searching for next free space
+                            execute_list[k].destination = issue_q[temp_index].destination;
+                            execute_list[k].destination_tag = issue_q[temp_index].destination_tag;
+                            execute_list[k].op_type = issue_q[temp_index].op_type;
+                            execute_list[k].source1 = issue_q[temp_index].source1;
+                            execute_list[k].source1_renamed = issue_q[temp_index].source1_renamed;
+                            execute_list[k].source1_ready = issue_q[temp_index].source1_ready;
+                            execute_list[k].source1_tag = issue_q[temp_index].source1_tag;
+                            execute_list[k].source2 = issue_q[temp_index].source2;
+                            execute_list[k].source2_renamed = issue_q[temp_index].source2_renamed;
+                            execute_list[k].source2_ready = issue_q[temp_index].source2_ready;
+                            execute_list[k].source2_tag = issue_q[temp_index].source2_tag;
+                            execute_list[k].timer = OP_LATENCY[execute_list[k].op_type]; //  will allow you to model its execution latency.
+                            begin_cycle[issue_q[temp_index].age].execute = cycles + 1;
+                            begin_cycle[issue_q[temp_index].age].issue_duration = begin_cycle[issue_q[temp_index].age].execute - begin_cycle[issue_q[temp_index].age].issue;
+                            break; // now searching for next free space
+                            }
                         }
                     }
                 }
@@ -618,15 +623,15 @@ class superscalar{
                         if(rmt[temp1].valid){
                             // check if destination is the source; and valid in rob and ready
                             for(int j = 0;j<rob_size;j++){
-                                if(rob[reg_read[i].source1_tag].ready && (rob[j].destination == reg_read[i].source1 && rob[j].ready && reg_read[i].source1_renamed)){
+                                if(rob[j].valid && rob[reg_read[i].source1_tag].ready && (rob[j].destination == reg_read[i].source1 && rob[j].ready && reg_read[i].source1_renamed)){
                                     reg_read[i].source1_ready = true;
                                     break;
                                 }
                             }
                         }
-                        else{ // not in rmt then in arf so ready
-                            reg_read[i].source1_ready = true;
-                        }
+                        // else{ // not in rmt then in arf so ready
+                        //     reg_read[i].source1_ready = true;
+                        // }
                         // set ready anyway. should we also set ready if no source? ask Prof: said yes or omit it
                     }
                     else if(temp1 == invalid_value){ // make it truw so that it doesnt cause delay
@@ -640,7 +645,7 @@ class superscalar{
                         // then also set ready
                         if(rmt[temp2].valid){
                             for(int j = 0;j<rob_size;j++){
-                                if(rob[reg_read[i].source2_tag].ready && (rob[j].destination == temp2) && (reg_read[i].source2_renamed) && rob[j].ready){
+                                if(rob[j].valid && rob[reg_read[i].source2_tag].ready && (rob[j].destination == temp2) && (reg_read[i].source2_renamed) && rob[j].ready){
                                     reg_read[i].source2_ready = true;
                                     break;
                                 }
@@ -748,15 +753,16 @@ class superscalar{
                                 // if not waiting then in ARF, set to 0
                                 // printf("Working till here\n");
                                 rename[i].source1_renamed = false;
+                                rename[i].source1_ready = true;
                                 rename[i].source1_tag = -1;
                                 // not there in rob
                             }
                             
                             // printf("Working till here 2 \n");
                         }
-                        // else{
-                        //     printf("it is -1\n");
-                        // }
+                        else{
+                            rename[i].source1_ready = true;
+                        }
                         // printf("Working till here\n");
                         // printf("Working till here\n"); -not working
                         if(rename[i].source2 != invalid_value){
@@ -774,6 +780,9 @@ class superscalar{
                                 rename[i].source2_tag = -1;
                                 // not there in rob
                             }
+                        }
+                        else{
+                             rename[i].source2_ready = true;
                         }
 
                         //  (3) rename its destination register (if it has one)
