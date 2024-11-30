@@ -454,7 +454,6 @@ class superscalar{
 
         for(int i = 0;i<iq_size; i++){
             if(issue_q[i].valid){
-
                 bool sources_ready = true;
 
                 if(issue_q[i].source1_renamed) {
