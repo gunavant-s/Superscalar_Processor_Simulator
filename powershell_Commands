@@ -5,3 +5,9 @@ for ($iq_size = 8; $iq_size -le 256; $iq_size *= 2) {
 >> }
 
 
+for ($rob_size = 32; $rob_size -le 512; $rob_size *= 2) {
+>>     for ($width = 8; $width -le 8; $width *= 2) {
+>>         ./testing $rob_size 8 $width val_trace_gcc1.txt | Out-File -Append -FilePath graph_1a.txt 
+>>     }
+>> }
+
