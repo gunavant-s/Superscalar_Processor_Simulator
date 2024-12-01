@@ -139,7 +139,7 @@ struct RMT{  //rename map table
 };
 
 struct ROB{
-    int rob_index = 0; // rob0,rob1 ...
+    uint64_t rob_index = 0; // rob0,rob1 ...
     int age= 0; // do we need valid bit
     int destination = 0;
     // no mis,exe needed
@@ -221,7 +221,7 @@ struct RT{
 class superscalar{
     public:
     bool end_of_file = false;
-    int head=0,tail=0; // increment whenever
+    int head=0,tail=0; // increment whenever entry in ROB
     int width,iq_size,rob_size,ex_width, wb_width;
     uint64_t pc = 0;
     int reduce_latency = -1;
@@ -231,7 +231,7 @@ class superscalar{
     // One way to annotate the age of an instruction is to assign an 
     // incrementing sequence number to each instruction as it is fetched from the trace file. instructions_count variable is there to track
     vector <pipeline_entries> entires;
-    vector <pipeline_begin_cycles> begin_cycle;
+    vector <pipeline_begin_cycles> begin_cycle; // values used for cycle start and duration
     int OP_LATENCY [3] = {1, 2, 5};
 
     // vector <RT> retire;
@@ -279,14 +279,14 @@ class superscalar{
         int retired = 0;
         // Only process up to WIDTH instructions
         while(retired < width && rob[head].valid && rob[head].ready) { //for loop timing out, while good
-            
+
             if(rob[head].destination != invalid) {
                 rob[head].valid = false;
-                if(rmt[rob[head].destination].valid && rmt[rob[head].destination].tag == rob[head].rob_index) {
+                if(rmt[rob[head].destination].valid && rmt[rob[head].destination].tag == rob[head].rob_index) { // this was the last fix 
                 rmt[rob[head].destination].valid = false;
                 }
             }
-            else if(rob[head].destination == -1){
+            else if(rob[head].destination == invalid){
                 rob[head].ready = false;
                 rob[head].valid = false;
 
@@ -311,12 +311,10 @@ class superscalar{
                 if(rob[writeback[i].destination_tag].valid) {
                     // mark instruction as ready in ROB
                     rob[writeback[i].destination_tag].ready = true;
-                    
                     rob[writeback[i].destination_tag].age = writeback[i].age;
                     begin_cycle[writeback[i].age].retire = cycles + 1;
                     begin_cycle[writeback[i].age].writeback_duration = begin_cycle[writeback[i].age].retire - begin_cycle[writeback[i].age].writeback;
-                    
-                    // Clear writeback entry
+                    // Remove instruction from writeback
                     writeback[i].valid = false;
                 }
             }
@@ -332,17 +330,17 @@ class superscalar{
         for(int i = 0;i<ex_width;i++){
             if(execute_list[i].valid){
                 if(execute_list[i].timer > 0) {
-                    execute_list[i].timer--;
+                    execute_list[i].timer += reduce_latency;
                 }
                 if(execute_list[i].timer == 0){
-                    int completing_tag = execute_list[i].destination_tag;
+                    uint64_t completing_tag = execute_list[i].destination_tag;
                     //first for IQ source 1
                     // 1) Remove the instruction from the execute_list -> just invalid it
                     // execute_list[i].valid = false; // removed 
                     // 2) Add the instruction to WB. Find an empty spot
                     for(int j = 0;j<wb_width;j++){
                         if(!writeback[j].valid){
-                            if(execute_list[i].destination != -1){
+                            if(execute_list[i].destination != invalid){
                                 for(int j = 0; j < iq_size; j++) {
                                     if(issue_q[j].valid) {
                                         if(issue_q[j].source1_tag == completing_tag) {
@@ -355,8 +353,7 @@ class superscalar{
                                         }
                                     }
                                 }//iq waking out done
-
-                                for(int k = 0; k < width; k++) {
+                                for(int k = 0; k < width; k++) { // avoiding timeout since width same anyway
                                     if(dispatch[k].valid) {
                                         if(dispatch[k].source1_tag == completing_tag) {
                                             dispatch[k].source1_ready = true;
@@ -373,13 +370,10 @@ class superscalar{
                                             reg_read[k].source2_ready = true;
                                         }
                                     }
-                                } // di waking up done
-
-                                // for(int j = 0; j < width; j++) {
-                                    
-                                // } // reg read wake up
+                                } // DI, RR waking up done
                             }
-                            //add here
+                            // while waking up after moving to ex stage, timing out wrong values, so DO IT BEFORE lol (took 4 days)
+                            //move to EX
                             execute_list[i].valid = false;
                             writeback[j].valid = true;
                             writeback[j].age = execute_list[i].age; // not sure this time due to timer, maybe execut.age
@@ -400,7 +394,6 @@ class superscalar{
                             break;
                         }
                     }
-
                     // 3) Wakeup dependent instructions (set their source operand ready flags) in 
                     // the IQ, DI (the dispatch bundle), and RR (the register-read bundle)
                     // compare this->destination with that_stage->source1/2 if not ready make it ready
@@ -414,72 +407,70 @@ class superscalar{
     void Issue() {
         // printf("IS start\n");
         vector<pair<int, int>> vec; // pair of <age, index>
-        
+        //Same like dic in python. When used just 1D vec didnt work because of same age probably
+        //THis safer
         // checking readiness of all instructions in IQ
         // Issue up to WIDTH oldest instructions from the IQ
         // head, keep on incrementing head: oldest - in rob
         //create an array of that size(number of instructions that are valid and are ready for execution in IQ bundle)
         //store all the valid ready elements(age parameter) in the array
-                    int iq_counts = 0;
-                    for(int i = 0; i < issue_q.size(); i++) {
-                        if(issue_q[i].valid && issue_q[i].source1_ready && issue_q[i].source2_ready){
-                            iq_counts++;
-                            vec.push_back({issue_q[i].age, i});
-                        }
-                    }
+        int iq_counts = 0;
+        for(int i = 0; i < (static_cast<int>(issue_q.size())); i++) {
+            if(issue_q[i].valid && issue_q[i].source1_ready && issue_q[i].source2_ready){
+                iq_counts++;
+                vec.push_back({issue_q[i].age, i});
+                }
+            }
         
-                    // Sort by age to maintain oldest-first policy
-                    sort(vec.begin(), vec.end());
+            // Sort by age to maintain oldest-first policy
+            sort(vec.begin(), vec.end());
                     
-                    // printf("%d\n",iq_counts);
-                    // Issue up to WIDTH instructions
-                    int issued = 0;
-                    // printf("Works\n");
-                    int min_value = min(static_cast<int>(vec.size()),width);
-                    // printf("%d %d\n",static_cast<int>(vec.size()),width);
-                    for(auto [age, idx] : vec) {
-                        if(issued >= min(iq_counts,width))
-                            break;
-                        else{
-                        // Find empty spot in execute_list
-                            for(int k = 0; k < ex_width; k++) {
-                                if(!execute_list[k].valid) {
-                        
-                                // removing the instruction from IQ
-                                // see nov 18 class at 39:30 then why valid = 0 lol
-                                // after it goes to next stage it wont be in IQ
-                                // adding the instruction to ex
-                                execute_list[k].valid = true;
-                                execute_list[k].age = issue_q[idx].age;
-
-                                execute_list[k].destination = issue_q[idx].destination;
-                                execute_list[k].destination_tag = issue_q[idx].destination_tag;
-                                execute_list[k].op_type = issue_q[idx].op_type;
-                                execute_list[k].source1 = issue_q[idx].source1;
-                                execute_list[k].source1_renamed = issue_q[idx].source1_renamed;
-                                execute_list[k].source1_ready = issue_q[idx].source1_ready;
-                                execute_list[k].source1_tag = issue_q[idx].source1_tag;
-                                execute_list[k].source2 = issue_q[idx].source2;
-                                execute_list[k].source2_renamed = issue_q[idx].source2_renamed;
-                                execute_list[k].source2_ready = issue_q[idx].source2_ready;
-                                execute_list[k].source2_tag = issue_q[idx].source2_tag;
-                                execute_list[k].timer = OP_LATENCY[execute_list[k].op_type]; //  will allow you to model its execution latency.
-                                begin_cycle[execute_list[k].age].execute = cycles + 1;
-                                begin_cycle[execute_list[k].age].issue_duration = begin_cycle[execute_list[k].age].execute - begin_cycle[issue_q[idx].age].issue;
-                                issue_q[idx].valid = false;
-                                issued++;
-                                break; // now searching for next free space
-                                }
-                            }
+            // printf("%d\n",iq_counts);
+            // Issue up to WIDTH instructions
+            int issued = 0;
+            // printf("Works\n");
+            // printf("%d %d\n",static_cast<int>(vec.size()),width);
+            for(auto [age, idx] : vec) {
+                if(issued >= min(iq_counts,width))
+                    break;
+                else{
+                // Find empty spot in execute_list
+                    for(int k = 0; k < ex_width; k++) {
+                        if(!execute_list[k].valid) {
+                        // removing the instruction from IQ
+                        // see nov 18 class at 39:30 then why valid = 0 lol
+                        // after it goes to next stage it wont be in IQ
+                        // adding the instruction to ex
+                        execute_list[k].valid = true;
+                        execute_list[k].age = issue_q[idx].age;
+                        execute_list[k].destination = issue_q[idx].destination;
+                        execute_list[k].destination_tag = issue_q[idx].destination_tag;
+                        execute_list[k].op_type = issue_q[idx].op_type;
+                        execute_list[k].source1 = issue_q[idx].source1;
+                        execute_list[k].source1_renamed = issue_q[idx].source1_renamed;
+                        execute_list[k].source1_ready = issue_q[idx].source1_ready;
+                        execute_list[k].source1_tag = issue_q[idx].source1_tag;
+                        execute_list[k].source2 = issue_q[idx].source2;
+                        execute_list[k].source2_renamed = issue_q[idx].source2_renamed;
+                        execute_list[k].source2_ready = issue_q[idx].source2_ready;
+                        execute_list[k].source2_tag = issue_q[idx].source2_tag;
+                        execute_list[k].timer = OP_LATENCY[execute_list[k].op_type]; //  will allow you to model its execution latency.
+                        begin_cycle[execute_list[k].age].execute = cycles + 1;
+                        begin_cycle[execute_list[k].age].issue_duration = begin_cycle[execute_list[k].age].execute - begin_cycle[issue_q[idx].age].issue;
+                        issue_q[idx].valid = false;
+                        issued++;
+                        break; // now searching for next free space
                         }
                     }
-                    // printf("Issue end\n");
+                }
+            }
+            // printf("Issue end\n");
                 }
             // valid_iq_counter = valid_iq_counter - 1;
         // }
     
     void Dispatch(){
-        // int invalid_value = -1;
+        // int invalid_value = invalid;
         // if(cycles == 528){
         //     printf("Issue queue\n");
         //     for(int i = 0;i<iq_size;i++){
@@ -490,7 +481,6 @@ class superscalar{
         int dispatch_count = 0;
         for(int i = 0;i<width;i++){
             if(dispatch[i].valid){   
-                dispatch_empty = false;
                 dispatch_count++;
             }
         }
@@ -507,9 +497,11 @@ class superscalar{
         if(free_entries == 0){
             return;
         }
+
+        dispatch_empty = dispatch_count > 0;
         enough_entries = free_entries >= dispatch_count;
         // printf("Dispatch start\n");
-        if(dispatch_count > 0){
+        if(dispatch_empty){
             if(enough_entries){
                 // dispatch all instructions from DI to the IQ
                 for(int i = 0;i<width;i++){
@@ -549,7 +541,7 @@ class superscalar{
         // If RR contains a register-read bundle:
         bool bundle_present = false;
         bool dispatch_empty = true;
-        int invalid_value = -1;
+        int invalid_value = invalid;
         
         for(int i = 0;i<width;i++){
             if(reg_read[i].valid){
@@ -623,7 +615,7 @@ class superscalar{
                                 }
                             }
                         }
-                        else{ //-1
+                        else{ //invalid
                             reg_read[i].source2_ready = true;
                         }
                         // set ready anyway. should we also set ready if no source? ask Prof
@@ -663,13 +655,13 @@ class superscalar{
         // If RN contains a rename bundle: 
         bool bundle_present = true;
         int rename_counts = 0;
-        int invalid_value = -1; // if equal to this do nothing
+        int invalid_value = invalid; // if equal to this do nothing
 
         for(int i = 0;i<width;i++){
-            // if(!rename[i].valid){
-            //     bundle_present = false;
-            //     return;
-            // }
+            if(!rename[i].valid){
+                bundle_present = false;
+                return;
+            }
             if(rename[i].valid){
                 rename_counts++;
             }
@@ -684,14 +676,10 @@ class superscalar{
             }
         }
 
-        // for(int i =0;i<width;i++){
-        //     rename_counts = (rename[i].valid)?rename_counter:(rename_counter+1);
-        // }
-        if(rename_counts > 0){ // // If RN contains a rename bundle: 
+        if(bundle_present){ // // If RN contains a rename bundle: 
             //the ROB has enough free entries >= width
             int rob_counter = 0;
             for(int i = 0;i<rob_size;i++){
-
                 if(!rob[i].valid){
                     rob_counter++;
                 }
@@ -726,7 +714,6 @@ class superscalar{
                                 rename[i].source1_renamed = true;
                                 rename[i].source1_ready = false;
                                 rename[i].source1_tag = rmt[temp].tag; //tail
-                                
                             }
                             else{
                                 // printf("after else check 1\n");
@@ -734,7 +721,7 @@ class superscalar{
                                 // printf("Working till here\n");
                                 rename[i].source1_renamed = false;
                                 rename[i].source1_ready = true;
-                                rename[i].source1_tag = -1;
+                                rename[i].source1_tag = invalid;
                                 // not there in rob
                             }
                             
@@ -759,7 +746,7 @@ class superscalar{
                                 // if not waiting then in ARF, set to 0
                                 rename[i].source2_renamed = false;
                                 rename[i].source2_ready = true;
-                                rename[i].source2_tag = -1;
+                                rename[i].source2_tag = invalid;
                                 // not there in rob
                             }
                         }
@@ -803,7 +790,6 @@ class superscalar{
             }
         }
         // printf("RN end\n");
-
     }
 
     void Decode(){
@@ -819,14 +805,6 @@ class superscalar{
             }
         } 
 
-        // for(int i = 0;i<width;i++){
-        //     if(decode[i].valid){
-        //         decode_count++;
-        //     }
-        // }
-
-        // bundle_present = decode_count == width;
-        int rename_counter = 0;
         if(bundle_present){
             for(int i = 0;i < width;i++){
                 if(!rename[i].valid){
@@ -884,13 +862,7 @@ class superscalar{
                 for(int i=0;i<width && !end_of_file;i++){    //upto width only
                     fscanf(FP,"%llx %d %d %d %d\n",&pc,&op_type,&destination,&source1,&source2);
 
-                    //  printf("Fetched instruction %d: pc = %x, op_type = %d, destination = %d, source1 = %d, source2 = %d\n", 
-                    // instructions_count, pc, op_type, destination, source1, source2);
-
-
                     instructions_count++; // increase after each read from file
-                    // printf("Instru count: %d\n",instructions_count);
-                    // printf("%llx %d %d %d\n",pc,op_type,destination,source1,source2);
                     decode[i].valid = true;
                     decode[i].op_type = op_type;
                     decode[i].destination = destination;
@@ -906,9 +878,6 @@ class superscalar{
                     entires[instructions_count].source2 = source2;
                     entires[instructions_count].destination = destination;
                     entires[instructions_count].valid = true;
-                    
-                    // printf("Added instruction %d to pipeline: cycles = %d, op_type = %d, source1 = %d, source2 = %d, destination = %d\n", 
-                    // instructions_count, cycles, op_type, source1, source2, destination);
                     
                     begin_cycle[instructions_count].fetch = cycles;
                     begin_cycle[instructions_count].decode = cycles + 1;
@@ -948,7 +917,7 @@ class superscalar{
             }
         }
         
-        // Checking Issue Queue
+        // Checking IQ
         for(int i = 0; i < iq_size; i++) {
             if(issue_q[i].valid){
                 pipeline_empty = false;
@@ -956,7 +925,7 @@ class superscalar{
             }
         }
         
-        // Checking Execute List
+        // Checking EX
         for(int i = 0; i < ex_width; i++) {
             if(execute_list[i].valid){
                 pipeline_empty = false;
@@ -964,7 +933,7 @@ class superscalar{
             }
         }
         
-        // Checking Writeback
+        // Checking WB
         for(int i = 0; i < wb_width; i++) {
             if(writeback[i].valid){
                 pipeline_empty = false;
@@ -987,10 +956,6 @@ class superscalar{
         if(pipeline_empty && end_of_file)
             return false;
 
-        // if(cycles == 10263){
-        //     return false;
-        // }    
-        
         return true;
     }
     
@@ -1033,13 +998,13 @@ class superscalar{
 
 // One way to annotate the age of an instruction is to assign an 
 // incrementing sequence number to each instruction as it is fetched from the trace file. Instruction_count variable is there to track
+// The variable age tracks this
 
 int main (int argc, char* argv[])
 {
     FILE *FP;               // File handler
     char *trace_file;       // Variable that holds trace file name;
     proc_params params;       // look at sim_bp.h header file for the the definition of struct proc_params
-    int op_type, dest, src1, src2;  // Variables are read from trace file
     uint64_t pc; // Variable holds the pc read from input file
     
     if (argc != 5)
@@ -1052,11 +1017,6 @@ int main (int argc, char* argv[])
     params.iq_size      = strtoul(argv[2], NULL, 10);
     params.width        = strtoul(argv[3], NULL, 10);
     trace_file          = argv[4];
-    // printf("rob_size:%lu "
-            // "iq_size:%lu "
-            // "width:%lu "
-            // "tracefile:%s\n", params.rob_size, params.iq_size, params.width, trace_file);
-    // Open trace_file in read mode
     FP = fopen(trace_file, "r");
     if(FP == NULL)
     {
@@ -1087,18 +1047,10 @@ int main (int argc, char* argv[])
         // printf("Fetch done\n\n");
     }while(superscalar_pipeline_simulator.Advance_Cycle());
 
-    // fclose(FP);
-
-    int count = superscalar_pipeline_simulator.instructions_count;
-
-    // vector<int> begin_cycle;
-    // begin_cycle.push_back
-
     superscalar_pipeline_simulator.print_values();
 
     float IPC = ((float)superscalar_pipeline_simulator.instructions_count/((float)superscalar_pipeline_simulator.cycles));
     printf("# === Simulator Command =========\n");
-    //print for command ;# ./sim 16 8 1 val_trace_gcc1
     printf("# ./sim %d %d %d %s\n",params.rob_size,params.iq_size,params.width,trace_file);
     printf("# === Processor Configuration ===\n");
     printf("# ROB_SIZE  = %d\n",superscalar_pipeline_simulator.rob_size);
@@ -1108,20 +1060,6 @@ int main (int argc, char* argv[])
     printf("# Dynamic Instruction Count    = %d\n",superscalar_pipeline_simulator.instructions_count);
     printf("# Cycles                       = %d\n",superscalar_pipeline_simulator.cycles);
     printf("# Instructions Per Cycle (IPC) = %.2f\n",IPC);
-
-
-    //
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////
-    //
-    // The following loop just tests reading the trace and echoing it back to the screen.
-    //
-    // Replace this loop with the "do { } while (Advance_Cycle());" loop indicated in the Project 3 spec.
-    // Note: fscanf() calls -- to obtain a fetch bundle worth of instructions from the trace -- should be
-    // inside the Fetch() function.
-    //
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////
-    // while(fscanf(FP, "%lx %d %d %d %d", &pc, &op_type, &dest, &src1, &src2) != EOF)
-    //     printf("%lx %d %d %d %d\n", pc, op_type, dest, src1, src2); //Print to check if inputs have been read correctly
 
     return 0;
 }
