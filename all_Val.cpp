@@ -1,3 +1,16 @@
+//------------------------------------------------------------------------------------------------------------
+// Filename    : sim_proc.cc
+// Author      : Gunavant Setty
+// Affiliation : North Carolina State University, Raleigh, NC
+// Date        : Dec 2024
+// Email       : gsetty@ncsu.edu, gunavantsetty26@gmail.com
+// Description : The code successfully realizes the Superscalar Pipeline Simulator,
+//	             including all the nine stages for different processor configuration {ROB_SIZE, IQ_SIZE, WIDTH}.
+//               The program also outputs the total cycles and the Instructions Per Cycle (IPC)                
+//------------------------------------------------------------------------------------------------------------
+// Project 3: Superscalar Pipeline Simulator
+//------------------------------------------------------------------------------------------------------------
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,11 +35,6 @@
 // From DI find an empty spot then transfer
 
 using namespace std;
-
-// struct temp{
-//     int age = 0;
-//     int index = 0;
-// };
 
 struct pipeline_entries{
     // for tracking
