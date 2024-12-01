@@ -327,32 +327,22 @@ class superscalar{
 
     void Retire() {
         int retired = 0;
-        int temp_head = head;
         // Only process up to WIDTH instructions
         while(retired < width && rob[head].valid && rob[head].ready) { //for loop timing out, while good
             // Break if we've reached an invalid entry
-            if(!rob[temp_head].valid) {
-                break;
+            rob[head].valid = false;
+            if(rob[head].destination != invalid) {
+            if(rmt[rob[head].destination].valid && 
+               rmt[rob[head].destination].tag == rob[head].rob_index) {
+                rmt[rob[head].destination].valid = false;
             }
-            // Break if instruction not ready
-            if(!rob[temp_head].ready) {
-                break;
-            }
-            // Process retirement
-            rob[temp_head].valid = false;
-            // Update RMT if > -1
-            if(rob[temp_head].destination != invalid) {
-                if(rmt[rob[temp_head].destination].valid && 
-                rmt[rob[temp_head].destination].tag == rob[temp_head].rob_index) {
-                    rmt[rob[temp_head].destination].valid = false;
-                }
-            }
+        }
+
             // Update timing info
-            begin_cycle[rob[temp_head].age].end = cycles + 1;
-            // Move head pointer
-            head = (head + 1) % rob_size;
-            temp_head = head;
-            retired++;
+        begin_cycle[rob[head].age].end = cycles + 1;
+        // Move head pointer
+        head = (head + 1) % rob_size;
+        retired++;
         }
     }
 
@@ -489,38 +479,26 @@ class superscalar{
         //create an array of that size(number of instructions that are valid and are ready for execution in IQ bundle)
         //store all the valid ready elements(age parameter) in the array
                     for(int i = 0; i < iq_size; i++) {
-                        if(issue_q[i].valid) {
-                            bool is_ready = true;
-                            // Check source operands readiness
-                            if(issue_q[i].source1_renamed && !issue_q[i].source1_ready) {
-                                is_ready = false;
-                            }
-                            if(issue_q[i].source2_renamed && !issue_q[i].source2_ready) {
-                                is_ready = false;
-                            }
-                            
-                            // If ready, add
-                            if(is_ready) {
-                                vec.push_back({issue_q[i].age, i});
-                            }
+                        if(issue_q[i].valid && issue_q[i].source1_ready && issue_q[i].source2_ready){
+                            vec.push_back({issue_q[i].age, i});
                         }
                     }
         
                     // Sort by age to maintain oldest-first policy
                     sort(vec.begin(), vec.end());
-                    int iq_counts = 0;
-                    for(int i = 0;i<iq_size;i++){
-                        if(issue_q[i].valid){
-                            iq_counts++;
-                        }
-                    }
+                    // int iq_counts = 0;
+                    // for(int i = 0;i<iq_size;i++){
+                    //     if(issue_q[i].valid){
+                    //         iq_counts++;
+                    //     }
+                    // }
                     // printf("%d\n",iq_counts);
                     // Issue up to WIDTH instructions
                     int issued = 0;
                     // printf("Works\n");
-                    int min_value = min(iq_counts,width);
+                    // int min_value = min(iq_counts,width);
                     for(auto [age, idx] : vec) {
-                        if(issued >= min_value)
+                        if(issued >= width)
                             break;
                         else{
                         // Find empty spot in execute_list
@@ -539,11 +517,11 @@ class superscalar{
                                 execute_list[k].op_type = issue_q[idx].op_type;
                                 execute_list[k].source1 = issue_q[idx].source1;
                                 execute_list[k].source1_renamed = issue_q[idx].source1_renamed;
-                                // execute_list[k].source1_ready = issue_q[idx].source1_ready;
+                                execute_list[k].source1_ready = issue_q[idx].source1_ready;
                                 execute_list[k].source1_tag = issue_q[idx].source1_tag;
                                 execute_list[k].source2 = issue_q[idx].source2;
                                 execute_list[k].source2_renamed = issue_q[idx].source2_renamed;
-                                // execute_list[k].source2_ready = issue_q[idx].source2_ready;
+                                execute_list[k].source2_ready = issue_q[idx].source2_ready;
                                 execute_list[k].source2_tag = issue_q[idx].source2_tag;
                                 execute_list[k].timer = OP_LATENCY[execute_list[k].op_type]; //  will allow you to model its execution latency.
                                 begin_cycle[execute_list[k].age].execute = cycles + 1;
@@ -1169,7 +1147,7 @@ int main (int argc, char* argv[])
     float IPC = ((float)superscalar_pipeline_simulator.instructions_count/((float)superscalar_pipeline_simulator.cycles));
     printf("# === Simulator Command =========\n");
     //print for command ;# ./sim 16 8 1 val_trace_gcc1
-    printf("./sim %d %d %d %s\n",params.rob_size,params.iq_size,params.width,trace_file);
+    printf("# ./sim %d %d %d %s\n",params.rob_size,params.iq_size,params.width,trace_file);
     printf("# === Processor Configuration ===\n");
     printf("# ROB_SIZE  = %d\n",superscalar_pipeline_simulator.rob_size);
     printf("# IQ_SIZE  = %d\n",superscalar_pipeline_simulator.iq_size);
