@@ -1,0 +1,5 @@
+for ($iq_size = 8; $iq_size -le 256; $iq_size *= 2) {
+>>     for ($width = 8; $width -le 8; $width *= 2) {
+>>         ./testing 512 $iq_size $width val_trace_perl1.txt | Out-File -Append -FilePath graph_1a.txt 
+>>     }
+>> }
